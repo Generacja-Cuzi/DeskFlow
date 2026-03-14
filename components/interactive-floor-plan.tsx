@@ -220,6 +220,7 @@ export function InteractiveFloorPlan({
   showReservationStatus = true, 
   enableReservation = true,
   clickableTypes = ["desk", "room"],
+  showContextLayout = false,
   availabilityByTarget,
   selectedRange,
   onElementClick,
@@ -599,7 +600,16 @@ export function InteractiveFloorPlan({
                 <Layer>
                   <Rect x={0} y={0} width={STAGE_WIDTH} height={STAGE_HEIGHT} fill="#fafafa" />
                   {renderGrid()}
-                  {filteredElements.map(renderElement)}
+                  {(showContextLayout
+                    ? filteredElements
+                    : filteredElements.filter((element) => {
+                        if (element.type === "wall" || element.type === "door") {
+                          return true
+                        }
+
+                        return clickableTypes.includes(element.type as "desk" | "room")
+                      })
+                  ).map(renderElement)}
                 </Layer>
               </Stage>
             </div>

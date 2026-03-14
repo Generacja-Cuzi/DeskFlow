@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Switch } from "@/components/ui/switch"
 import {
   Tabs,
   TabsContent,
@@ -21,11 +22,19 @@ import {
   Trash2,
 } from "lucide-react"
 import { useBranding } from "@/lib/contexts/branding-context"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function CompanySettingsPage() {
   const { branding, updateBranding } = useBranding()
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [isNotificationsDialogOpen, setIsNotificationsDialogOpen] = useState(false)
+  const [notificationSettings, setNotificationSettings] = useState({
+    emailEnabled: true,
+    reservationAlerts: true,
+    requestAlerts: true,
+    dailySummary: false,
+  })
   
   // Local state for form
   const [formData, setFormData] = useState({
@@ -55,6 +64,18 @@ export default function CompanySettingsPage() {
       phone: branding.phone || "",
     })
   }, [branding])
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem("company-notification-settings")
+    if (!raw) return
+
+    try {
+      const parsed = JSON.parse(raw)
+      setNotificationSettings((prev) => ({ ...prev, ...parsed }))
+    } catch {
+      // Ignore malformed local settings.
+    }
+  }, [])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -97,6 +118,50 @@ export default function CompanySettingsPage() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleExportData = async () => {
+    setSaveMessage(null)
+    const response = await fetch('/api/admin/export-data', { cache: 'no-store' })
+    if (!response.ok) {
+      setSaveMessage("Nie udalo sie wyeksportowac danych.")
+      return
+    }
+
+    const payload = await response.json()
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `deskflow-export-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setSaveMessage("Eksport danych zostal pobrany.")
+  }
+
+  const handleSaveNotifications = () => {
+    window.localStorage.setItem("company-notification-settings", JSON.stringify(notificationSettings))
+    setIsNotificationsDialogOpen(false)
+    setSaveMessage("Zapisano ustawienia powiadomien.")
+  }
+
+  const handleResetBranding = async () => {
+    const defaults = {
+      name: "DeskFlow",
+      logo: undefined,
+      primaryColor: "#3b82f6",
+      secondaryColor: "#10b981",
+      textColor: "#111827",
+      activeButtonTextColor: "#ffffff",
+      description: "",
+      website: "",
+      address: "",
+      phone: "",
+    }
+
+    setFormData(defaults)
+    await updateBranding(defaults)
+    setSaveMessage("Przywrocono domyslne ustawienia.")
   }
 
   return (
@@ -410,17 +475,7 @@ export default function CompanySettingsPage() {
                         Pobierz dane swojej firmy w formacie JSON
                       </p>
                     </div>
-                    <Button variant="outline">Eksportuj</Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <p className="font-medium">Integracje</p>
-                      <p className="text-sm text-muted-foreground">
-                        Zarządzaj integracjami z zewnętrznymi systemami
-                      </p>
-                    </div>
-                    <Button variant="outline">Konfiguruj</Button>
+                    <Button variant="outline" onClick={handleExportData}>Eksportuj</Button>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-lg border">
@@ -430,7 +485,7 @@ export default function CompanySettingsPage() {
                         Ustawienia powiadomień dla całej firmy
                       </p>
                     </div>
-                    <Button variant="outline">Zarządzaj</Button>
+                    <Button variant="outline" onClick={() => setIsNotificationsDialogOpen(true)}>Zarzadzaj</Button>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-lg border">
@@ -442,18 +497,7 @@ export default function CompanySettingsPage() {
                     </div>
                     <Button 
                       variant="outline"
-                      onClick={() => {
-                        setFormData({
-                          name: "DeskFlow",
-                          logo: undefined,
-                          primaryColor: "#3b82f6",
-                          secondaryColor: "#10b981",
-                          description: "",
-                          website: "",
-                          address: "",
-                          phone: "",
-                        })
-                      }}
+                      onClick={handleResetBranding}
                     >
                       Reset
                     </Button>
@@ -464,6 +508,63 @@ export default function CompanySettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={isNotificationsDialogOpen} onOpenChange={setIsNotificationsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ustawienia powiadomien</DialogTitle>
+            <DialogDescription>
+              Ustal globalne powiadomienia dla firmy.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="font-medium">Powiadomienia email</p>
+                <p className="text-sm text-muted-foreground">Wysylaj powiadomienia na skrzynki firmowe</p>
+              </div>
+              <Switch
+                checked={notificationSettings.emailEnabled}
+                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, emailEnabled: checked }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="font-medium">Alerty o rezerwacjach</p>
+                <p className="text-sm text-muted-foreground">Nowe i anulowane rezerwacje biurek/sal</p>
+              </div>
+              <Switch
+                checked={notificationSettings.reservationAlerts}
+                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, reservationAlerts: checked }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="font-medium">Alerty o wnioskach</p>
+                <p className="text-sm text-muted-foreground">Nowe wnioski o wypozyczenie sprzetu</p>
+              </div>
+              <Switch
+                checked={notificationSettings.requestAlerts}
+                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, requestAlerts: checked }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="font-medium">Codzienne podsumowanie</p>
+                <p className="text-sm text-muted-foreground">Podsumowanie zajetosci i wypozyczen</p>
+              </div>
+              <Switch
+                checked={notificationSettings.dailySummary}
+                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, dailySummary: checked }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNotificationsDialogOpen(false)}>Anuluj</Button>
+            <Button onClick={handleSaveNotifications}>Zapisz</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

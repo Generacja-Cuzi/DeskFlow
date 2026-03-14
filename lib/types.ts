@@ -189,6 +189,7 @@ export interface InteractiveFloorPlanProps {
   availabilityByTarget?: Record<string, Array<{ startAt: string; endAt: string }>>
   selectedRange?: { startTime: string; endTime: string }
   className?: string
+  showContextLayout?: boolean
 }
 
 export interface ReservationDialogProps {

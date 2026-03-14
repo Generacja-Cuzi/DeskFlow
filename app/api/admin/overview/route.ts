@@ -1,8 +1,8 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { reservations, resources, userCompanyMemberships, users } from '@/lib/db/schema'
+import { floorElements, reservations, resources, userCompanyMemberships, users } from '@/lib/db/schema'
 import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
@@ -15,6 +15,25 @@ function toPolishType(type: string) {
   if (type === 'desk') return 'Biurko'
   if (type === 'room') return 'Sala'
   return type
+}
+
+const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories']
+const reservationBlockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming']
+
+function getCurrentHalfHourWindow() {
+  const now = new Date()
+  const start = new Date(now)
+  start.setSeconds(0, 0)
+  start.setMinutes(Math.floor(now.getMinutes() / 30) * 30)
+
+  const end = new Date(start)
+  end.setMinutes(end.getMinutes() + 30)
+
+  return { start, end }
+}
+
+function intervalsOverlap(startA: Date, endA: Date, startB: Date, endB: Date) {
+  return startA < endB && startB < endA
 }
 
 export async function GET() {
@@ -30,16 +49,36 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const [membershipsRows, resourcesRows, reservationRows] = await Promise.all([
+  const [membershipsRows, resourcesRows, reservationRows, desksRows] = await Promise.all([
     db.query.userCompanyMemberships.findMany({
       where: eq(userCompanyMemberships.companyId, companyId),
       with: {
         user: true,
       },
     }),
-    db.query.resources.findMany({ where: eq(resources.companyId, companyId) }),
+    db.query.resources.findMany({
+      where: and(eq(resources.companyId, companyId), inArray(resources.category, equipmentCategories)),
+    }),
     db.query.reservations.findMany({ where: eq(reservations.companyId, companyId), with: { user: true } }),
+    db.query.floorElements.findMany({
+      where: inArray(floorElements.type, ['desk']),
+      with: {
+        floor: true,
+      },
+    }),
   ])
+
+  const companyDeskRows = desksRows.filter((desk) => desk.floor.companyId === companyId)
+  const { start: windowStart, end: windowEnd } = getCurrentHalfHourWindow()
+
+  const deskReservationsInWindow = reservationRows.filter(
+    (row) =>
+      row.type === 'desk' &&
+      reservationBlockingStatuses.includes(row.status) &&
+      intervalsOverlap(row.startAt, row.endAt, windowStart, windowEnd)
+  )
+
+  const occupiedDeskIds = new Set(deskReservationsInWindow.map((row) => row.targetId))
 
   const usersRows = membershipsRows.map((membership) => ({
     id: membership.user?.id || membership.userId,
@@ -51,8 +90,8 @@ export async function GET() {
   }))
 
   const activeReservationsCount = reservationRows.filter((r) => r.status === 'active' || r.status === 'upcoming').length
-  const availableDesksCount = resourcesRows.filter((r) => r.type === 'Biurko' && r.status === 'available').length
-  const desksCount = resourcesRows.filter((r) => r.type === 'Biurko').length
+  const availableDesksCount = companyDeskRows.filter((desk) => !occupiedDeskIds.has(desk.id)).length
+  const desksCount = companyDeskRows.length
   const borrowedEquipmentCount = resourcesRows.filter((r) => r.status === 'borrowed').length
 
   const stats = [

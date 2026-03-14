@@ -435,6 +435,7 @@ export default function SalePage() {
             mode="reservation"
             enableReservation={false}
             clickableTypes={["room"]}
+            showContextLayout
             availabilityByTarget={availability}
             selectedRange={{ startTime, endTime }}
             onElementClick={handleMapElementClick}

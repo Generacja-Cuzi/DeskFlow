@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
   }
 
+  if (!actor.user?.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const room = await db.query.floorElements.findFirst({ where: eq(floorElements.id, body.roomId) })
 
   if (!room) {
@@ -74,6 +78,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Room is already reserved in selected time range' }, { status: 409 })
   }
 
+  const userSameDayReservations = await db.query.reservations.findMany({
+    where: and(
+      eq(reservations.companyId, companyId),
+      eq(reservations.type, 'room'),
+      eq(reservations.userId, actor.user.id),
+      eq(reservations.date, date),
+      inArray(reservations.status, blockingStatuses)
+    ),
+  })
+
+  const hasUserOverlap = userSameDayReservations.some((row) => intervalsOverlap(startAt, endAt, row.startAt, row.endAt))
+
+  if (hasUserOverlap) {
+    return NextResponse.json({ error: 'Masz juz rezerwacje sali w tym przedziale czasu' }, { status: 409 })
+  }
+
   const startLabel = startAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
   const endLabel = endAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
   const timeSlot = `${startLabel} - ${endLabel}`
@@ -83,7 +103,7 @@ export async function POST(request: Request) {
     .values({
       id: crypto.randomUUID(),
       companyId,
-      userId: actor.user?.id || null,
+      userId: actor.user.id,
       type: 'room',
       targetId: body.roomId,
       name: room.name,

@@ -24,6 +24,7 @@ import {
   Edit,
   Trash2,
   Download,
+  FileText,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -121,6 +122,39 @@ type AdminReservation = {
   meetingTitle?: string | null
 }
 
+type AdminUser = {
+  id: string
+  name: string
+  email: string
+  department: string | null
+  role: string
+  status: string
+}
+
+type AdminResource = {
+  id: string
+  name: string
+  type: string
+  category?: string | null
+  location: string
+  serialNumber?: string | null
+  description?: string | null
+  status: string
+  workflowStatus?: string | null
+  workflowReservationId?: string | null
+  workflowUser?: string | null
+  workflowDueDate?: string | null
+}
+
+const equipmentCategories = [
+  { value: "all", label: "Wszystkie" },
+  { value: "laptops", label: "Laptopy" },
+  { value: "monitors", label: "Monitory" },
+  { value: "projectors", label: "Projektory" },
+  { value: "vehicles", label: "Pojazdy" },
+  { value: "accessories", label: "Akcesoria" },
+]
+
 const fallbackResources = [
   { id: 1, name: "Biurko A-01", type: "Biurko", location: "Strefa A, P1", status: "available" },
   { id: 2, name: "Sala Konferencyjna A", type: "Sala", location: "Pietro 1", status: "occupied" },
@@ -141,11 +175,15 @@ export default function AdminPage() {
   const [usageDataState, setUsageDataState] = useState(initialUsageData)
   const [monthlyDataState, setMonthlyDataState] = useState(initialMonthlyData)
   const [pendingRequestsState, setPendingRequestsState] = useState(initialPendingRequests)
-  const [usersState, setUsersState] = useState(initialUsers)
-  const [resourcesState, setResourcesState] = useState(initialResources)
+  const [usersState, setUsersState] = useState<AdminUser[]>(initialUsers as unknown as AdminUser[])
+  const [resourcesState, setResourcesState] = useState<AdminResource[]>(initialResources)
   const [showAddResourceDialog, setShowAddResourceDialog] = useState(false)
+  const [showEditResourceDialog, setShowEditResourceDialog] = useState(false)
+  const [showEditUserDialog, setShowEditUserDialog] = useState(false)
   const [showAddUserDialog, setShowAddUserDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [resourceCategoryFilter, setResourceCategoryFilter] = useState("all")
+  const [resourceStatusFilter, setResourceStatusFilter] = useState("all")
   const [reservationSearchQuery, setReservationSearchQuery] = useState("")
   const [filterFromDate, setFilterFromDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [filterToDate, setFilterToDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -158,6 +196,16 @@ export default function AdminPage() {
     name: "",
     email: "",
     department: "",
+  })
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [editingResource, setEditingResource] = useState<AdminResource | null>(null)
+  const [resourceForm, setResourceForm] = useState({
+    name: "",
+    category: "laptops",
+    location: "",
+    serialNumber: "",
+    description: "",
+    status: "available",
   })
 
   const loadAdminReservations = async () => {
@@ -255,6 +303,32 @@ export default function AdminPage() {
     await loadOverview()
   }
 
+  const handleOpenEditUser = (user: AdminUser) => {
+    setEditingUser(user)
+    setShowEditUserDialog(true)
+  }
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return
+
+    const response = await fetch(`/api/admin/users/${editingUser.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editingUser.name,
+        email: editingUser.email,
+        department: editingUser.department || "",
+        status: editingUser.status,
+      }),
+    })
+
+    if (!response.ok) return
+
+    setShowEditUserDialog(false)
+    setEditingUser(null)
+    await loadOverview()
+  }
+
   const handleApprove = async (id: string | number) => {
     const response = await fetch(`/api/admin/requests/${id}/decision`, {
       method: 'PATCH',
@@ -309,17 +383,109 @@ export default function AdminPage() {
     await Promise.all([loadOverview(), loadAdminReservations()])
   }
 
+  const handleDeleteReservationFromHistory = async (reservationId: string) => {
+    const response = await fetch(`/api/admin/reservations/${reservationId}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) return
+
+    await Promise.all([loadOverview(), loadAdminReservations()])
+  }
+
+  const resetResourceForm = () => {
+    setResourceForm({
+      name: "",
+      category: "laptops",
+      location: "",
+      serialNumber: "",
+      description: "",
+      status: "available",
+    })
+  }
+
+  const handleCreateResource = async () => {
+    const response = await fetch("/api/admin/resources", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(resourceForm),
+    })
+
+    if (!response.ok) return
+
+    setShowAddResourceDialog(false)
+    resetResourceForm()
+    await loadOverview()
+  }
+
+  const handleOpenEditResource = (resource: AdminResource) => {
+    setEditingResource(resource)
+    setResourceForm({
+      name: resource.name,
+      category: resource.category || "laptops",
+      location: resource.location,
+      serialNumber: resource.serialNumber || "",
+      description: resource.description || "",
+      status: resource.status,
+    })
+    setShowEditResourceDialog(true)
+  }
+
+  const handleUpdateResource = async () => {
+    if (!editingResource) return
+
+    const response = await fetch(`/api/admin/resources/${editingResource.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(resourceForm),
+    })
+
+    if (!response.ok) return
+
+    setShowEditResourceDialog(false)
+    setEditingResource(null)
+    resetResourceForm()
+    await loadOverview()
+  }
+
+  const handleDeleteResource = async (resourceId: string) => {
+    const response = await fetch(`/api/admin/resources/${resourceId}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) return
+
+    await loadOverview()
+  }
+
+  const handleExportReport = () => {
+    window.open("/api/admin/reports/export", "_blank")
+  }
+
   const filteredResources = resourcesState.filter((resource) => {
     if (!searchQuery.trim()) {
+      if (resourceCategoryFilter !== "all" && resource.category !== resourceCategoryFilter) {
+        return false
+      }
+
+      if (resourceStatusFilter !== "all" && resource.status !== resourceStatusFilter) {
+        return false
+      }
+
       return true
     }
 
     const query = searchQuery.toLowerCase()
-    return (
+    const matchesQuery = (
       resource.name.toLowerCase().includes(query) ||
       resource.type.toLowerCase().includes(query) ||
       resource.location.toLowerCase().includes(query)
     )
+
+    const matchesCategory = resourceCategoryFilter === "all" || resource.category === resourceCategoryFilter
+    const matchesStatus = resourceStatusFilter === "all" || resource.status === resourceStatusFilter
+
+    return matchesQuery && matchesCategory && matchesStatus
   })
 
   const filterReservationRows = (rows: AdminReservation[]) => {
@@ -366,7 +532,7 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportReport}>
             <Download className="h-4 w-4 mr-2" />
             Eksportuj raport
           </Button>
@@ -542,8 +708,8 @@ export default function AdminPage() {
             Sale
           </TabsTrigger>
           <TabsTrigger value="resources">
-            <Package className="h-4 w-4 mr-2" />
-            Zasoby
+            <FileText className="h-4 w-4 mr-2" />
+            Sprzet
           </TabsTrigger>
           <TabsTrigger value="users">
             <Users className="h-4 w-4 mr-2" />
@@ -609,16 +775,29 @@ export default function AdminPage() {
                         <Badge variant="outline">{reservation.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive hover:bg-destructive/10"
-                          onClick={() => handleCancelReservation(reservation.id)}
-                          disabled={["cancelled", "completed", "rejected"].includes(reservation.status)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Anuluj
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleCancelReservation(reservation.id)}
+                              disabled={["cancelled", "completed", "rejected"].includes(reservation.status)}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Anuluj
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteReservationFromHistory(reservation.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Usun z historii
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -693,16 +872,29 @@ export default function AdminPage() {
                         <Badge variant="outline">{reservation.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive hover:bg-destructive/10"
-                          onClick={() => handleCancelReservation(reservation.id)}
-                          disabled={["cancelled", "completed", "rejected"].includes(reservation.status)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Anuluj
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleCancelReservation(reservation.id)}
+                              disabled={["cancelled", "completed", "rejected"].includes(reservation.status)}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Anuluj
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteReservationFromHistory(reservation.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Usun z historii
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -715,15 +907,15 @@ export default function AdminPage() {
         <TabsContent value="resources" className="mt-6">
           <Card>
             <CardHeader>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-col gap-4">
                 <div>
-                  <CardTitle>Zarzadzanie zasobami</CardTitle>
+                  <CardTitle>Zarzadzanie sprzetem</CardTitle>
                   <CardDescription>
-                    Lista zasobow sprzetowych. Biurka i sale dodajesz oraz edytujesz w edytorze pietra.
+                    Sprzet firmowy z filtrami kategorii i statusu.
                   </CardDescription>
                 </div>
-                <div className="flex w-full md:w-auto gap-3">
-                  <div className="relative w-full md:w-64">
+                <div className="flex flex-col lg:flex-row gap-3">
+                  <div className="relative w-full lg:flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Szukaj zasobu..."
@@ -732,6 +924,29 @@ export default function AdminPage() {
                       className="pl-9"
                     />
                   </div>
+                  <Select value={resourceCategoryFilter} onValueChange={setResourceCategoryFilter}>
+                    <SelectTrigger className="w-full lg:w-[180px]">
+                      <SelectValue placeholder="Kategoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {equipmentCategories.map((category) => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={resourceStatusFilter} onValueChange={setResourceStatusFilter}>
+                    <SelectTrigger className="w-full lg:w-[180px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Wszystkie statusy</SelectItem>
+                      <SelectItem value="available">Dostepne</SelectItem>
+                      <SelectItem value="borrowed">Wypozyczone</SelectItem>
+                      <SelectItem value="maintenance">W serwisie</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button onClick={() => setShowAddResourceDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Dodaj zasob
@@ -805,11 +1020,11 @@ export default function AdminPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenEditResource(resource)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edytuj
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">
+                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteResource(String(resource.id))}>
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Usun
                                 </DropdownMenuItem>
@@ -891,7 +1106,7 @@ export default function AdminPage() {
                                 Odbierz role administratora
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenEditUser(user)}>
                               <Edit className="h-4 w-4 mr-2" />
                               Edytuj
                             </DropdownMenuItem>
@@ -924,23 +1139,27 @@ export default function AdminPage() {
             <FieldGroup>
               <Field>
                 <FieldLabel>Nazwa zasobu</FieldLabel>
-                <Input placeholder="np. Biurko A-15" />
+                <Input
+                  placeholder="np. MacBook Pro 14"
+                  value={resourceForm.name}
+                  onChange={(event) => setResourceForm({ ...resourceForm, name: event.target.value })}
+                />
               </Field>
             </FieldGroup>
 
             <FieldGroup>
               <Field>
                 <FieldLabel>Typ zasobu</FieldLabel>
-                <Select>
+                <Select value={resourceForm.category} onValueChange={(value) => setResourceForm({ ...resourceForm, category: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Wybierz typ" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="laptop">Laptop</SelectItem>
-                    <SelectItem value="monitor">Monitor</SelectItem>
-                    <SelectItem value="projector">Projektor</SelectItem>
-                    <SelectItem value="vehicle">Pojazd</SelectItem>
-                    <SelectItem value="other">Inne</SelectItem>
+                    <SelectItem value="laptops">Laptop</SelectItem>
+                    <SelectItem value="monitors">Monitor</SelectItem>
+                    <SelectItem value="projectors">Projektor</SelectItem>
+                    <SelectItem value="vehicles">Pojazd</SelectItem>
+                    <SelectItem value="accessories">Akcesorium</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
@@ -949,14 +1168,33 @@ export default function AdminPage() {
             <FieldGroup>
               <Field>
                 <FieldLabel>Lokalizacja</FieldLabel>
-                <Input placeholder="np. Strefa A, Pietro 1" />
+                <Input
+                  placeholder="np. Magazyn IT"
+                  value={resourceForm.location}
+                  onChange={(event) => setResourceForm({ ...resourceForm, location: event.target.value })}
+                />
               </Field>
             </FieldGroup>
 
             <FieldGroup>
               <Field>
                 <FieldLabel>Numer seryjny / Identyfikator</FieldLabel>
-                <Input placeholder="np. SN-2024-001" />
+                <Input
+                  placeholder="np. SN-2024-001"
+                  value={resourceForm.serialNumber}
+                  onChange={(event) => setResourceForm({ ...resourceForm, serialNumber: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Opis</FieldLabel>
+                <Input
+                  placeholder="Krotki opis zasobu"
+                  value={resourceForm.description}
+                  onChange={(event) => setResourceForm({ ...resourceForm, description: event.target.value })}
+                />
               </Field>
             </FieldGroup>
           </div>
@@ -964,9 +1202,96 @@ export default function AdminPage() {
             <Button variant="outline" onClick={() => setShowAddResourceDialog(false)}>
               Anuluj
             </Button>
-            <Button onClick={() => setShowAddResourceDialog(false)}>
+            <Button onClick={handleCreateResource}>
               Dodaj zasob
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditResourceDialog} onOpenChange={setShowEditResourceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edytuj zasob</DialogTitle>
+            <DialogDescription>
+              Zmien dane zasobu sprzetowego.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Nazwa zasobu</FieldLabel>
+                <Input
+                  value={resourceForm.name}
+                  onChange={(event) => setResourceForm({ ...resourceForm, name: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Kategoria</FieldLabel>
+                <Select value={resourceForm.category} onValueChange={(value) => setResourceForm({ ...resourceForm, category: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="laptops">Laptop</SelectItem>
+                    <SelectItem value="monitors">Monitor</SelectItem>
+                    <SelectItem value="projectors">Projektor</SelectItem>
+                    <SelectItem value="vehicles">Pojazd</SelectItem>
+                    <SelectItem value="accessories">Akcesorium</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Status</FieldLabel>
+                <Select value={resourceForm.status} onValueChange={(value) => setResourceForm({ ...resourceForm, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="available">Dostepny</SelectItem>
+                    <SelectItem value="borrowed">Wypozyczony</SelectItem>
+                    <SelectItem value="maintenance">W serwisie</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Lokalizacja</FieldLabel>
+                <Input
+                  value={resourceForm.location}
+                  onChange={(event) => setResourceForm({ ...resourceForm, location: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Numer seryjny</FieldLabel>
+                <Input
+                  value={resourceForm.serialNumber}
+                  onChange={(event) => setResourceForm({ ...resourceForm, serialNumber: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Opis</FieldLabel>
+                <Input
+                  value={resourceForm.description}
+                  onChange={(event) => setResourceForm({ ...resourceForm, description: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditResourceDialog(false)}>
+              Anuluj
+            </Button>
+            <Button onClick={handleUpdateResource}>Zapisz zmiany</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1019,6 +1344,105 @@ export default function AdminPage() {
               Anuluj
             </Button>
             <Button onClick={handleAddUser}>Dodaj uzytkownika</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edytuj uzytkownika</DialogTitle>
+            <DialogDescription>
+              Zmien dane i status uzytkownika.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Imie i nazwisko</FieldLabel>
+                <Input
+                  value={editingUser?.name || ""}
+                  onChange={(event) =>
+                    setEditingUser((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            name: event.target.value,
+                          }
+                        : prev
+                    )
+                  }
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Email</FieldLabel>
+                <Input
+                  value={editingUser?.email || ""}
+                  onChange={(event) =>
+                    setEditingUser((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            email: event.target.value,
+                          }
+                        : prev
+                    )
+                  }
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Dzial</FieldLabel>
+                <Input
+                  value={editingUser?.department || ""}
+                  onChange={(event) =>
+                    setEditingUser((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            department: event.target.value,
+                          }
+                        : prev
+                    )
+                  }
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Status</FieldLabel>
+                <Select
+                  value={editingUser?.status || "active"}
+                  onValueChange={(value) =>
+                    setEditingUser((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            status: value,
+                          }
+                        : prev
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Aktywny</SelectItem>
+                    <SelectItem value="inactive">Nieaktywny</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditUserDialog(false)}>
+              Anuluj
+            </Button>
+            <Button onClick={handleUpdateUser}>Zapisz zmiany</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

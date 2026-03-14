@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
   }
 
+  if (!actor.user?.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const desk = await db.query.floorElements.findFirst({ where: eq(floorElements.id, body.deskId) })
 
   if (!desk) {
@@ -67,12 +71,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Desk is already reserved in selected time range' }, { status: 409 })
   }
 
+  const userSameDayReservations = await db.query.reservations.findMany({
+    where: and(
+      eq(reservations.companyId, companyId),
+      eq(reservations.type, 'desk'),
+      eq(reservations.userId, actor.user.id),
+      eq(reservations.date, date),
+      inArray(reservations.status, blockingStatuses)
+    ),
+  })
+
+  const hasUserOverlap = userSameDayReservations.some((row) => intervalsOverlap(startAt, endAt, row.startAt, row.endAt))
+
+  if (hasUserOverlap) {
+    return NextResponse.json({ error: 'Masz juz rezerwacje biurka w tym przedziale czasu' }, { status: 409 })
+  }
+
   await db
     .insert(reservations)
     .values({
       id: crypto.randomUUID(),
       companyId,
-      userId: actor.user?.id || null,
+      userId: actor.user.id,
       type: 'desk',
       targetId: body.deskId,
       name: desk.name,
