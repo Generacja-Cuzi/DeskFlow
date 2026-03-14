@@ -2,8 +2,8 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { users } from '@/lib/db/schema'
-import { getActor } from '@/lib/server/auth'
+import { userCompanyMemberships, users } from '@/lib/db/schema'
+import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
 function normalizeEmail(value: string) {
@@ -13,7 +13,7 @@ function normalizeEmail(value: string) {
 export async function POST(request: Request) {
   const actor = await getActor()
 
-  if (!actor.user || (actor.user.role !== 'admin' && actor.user.role !== 'superadmin')) {
+  if (!actor.user) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -21,6 +21,12 @@ export async function POST(request: Request) {
 
   if (!companyId) {
     return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
+  const canManage = await canManageCompany(companyId)
+
+  if (!canManage) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = await request.json()
@@ -38,13 +44,28 @@ export async function POST(request: Request) {
     await db
       .update(users)
       .set({
-        companyId,
         name,
         department,
-        role: 'user',
         status: 'active',
       })
       .where(eq(users.id, existingByEmail.id))
+
+    await db
+      .insert(userCompanyMemberships)
+      .values({
+        id: crypto.randomUUID(),
+        userId: existingByEmail.id,
+        companyId,
+        role: 'user',
+        status: 'active',
+      })
+      .onConflictDoUpdate({
+        target: [userCompanyMemberships.userId, userCompanyMemberships.companyId],
+        set: {
+          role: 'user',
+          status: 'active',
+        },
+      })
 
     return NextResponse.json({ ok: true, id: existingByEmail.id, updated: true })
   }
@@ -57,6 +78,14 @@ export async function POST(request: Request) {
     name,
     email,
     department,
+    role: 'user',
+    status: 'active',
+  })
+
+  await db.insert(userCompanyMemberships).values({
+    id: crypto.randomUUID(),
+    userId: id,
+    companyId,
     role: 'user',
     status: 'active',
   })

@@ -39,14 +39,18 @@ import {
   Bar,
 } from "recharts"
 
-const stats = [
+const initialStats: Array<{ name: string; value: string; change: string; icon?: any; color?: string }> = []
+
+const fallbackStats = [
   { name: "Aktywne rezerwacje", value: "156", change: "+12%", icon: Calendar, color: "text-primary" },
   { name: "Uzytkownicy", value: "89", change: "+5%", icon: Users, color: "text-accent" },
   { name: "Dostepne biurka", value: "24/40", change: "60%", icon: Monitor, color: "text-chart-3" },
   { name: "Wypozyczony sprzet", value: "18", change: "-3%", icon: Package, color: "text-chart-5" },
 ]
 
-const usageData = [
+const initialUsageData: Array<{ name: string; biurka: number; sale: number; sprzet: number }> = []
+
+const fallbackUsageData = [
   { name: "Pon", biurka: 35, sale: 8, sprzet: 12 },
   { name: "Wt", biurka: 38, sale: 10, sprzet: 15 },
   { name: "Sr", biurka: 40, sale: 12, sprzet: 14 },
@@ -54,7 +58,9 @@ const usageData = [
   { name: "Pt", biurka: 28, sale: 6, sprzet: 10 },
 ]
 
-const monthlyData = [
+const initialMonthlyData: Array<{ name: string; rezerwacje: number }> = []
+
+const fallbackMonthlyData = [
   { name: "Sty", rezerwacje: 120 },
   { name: "Lut", rezerwacje: 145 },
   { name: "Mar", rezerwacje: 160 },
@@ -63,13 +69,25 @@ const monthlyData = [
   { name: "Cze", rezerwacje: 175 },
 ]
 
-const pendingRequests = [
+const initialPendingRequests: Array<{
+  id: string
+  user: string
+  type: string
+  item: string
+  date: string
+  status: string
+  purpose?: string | null
+}> = []
+
+const fallbackPendingRequests = [
   { id: 1, user: "Anna Nowak", type: "Sprzet", item: "MacBook Pro 16\"", date: "11.03.2026", status: "pending" },
   { id: 2, user: "Piotr Wisniewski", type: "Sprzet", item: "Projektor Epson", date: "11.03.2026", status: "pending" },
   { id: 3, user: "Maria Kowalczyk", type: "Pojazd", item: "Ford Focus", date: "10.03.2026", status: "pending" },
 ]
 
-const users = [
+const initialUsers: Array<{ id: string; name: string; email: string; department: string | null; role: string; status: string }> = []
+
+const fallbackUsers = [
   { id: 1, name: "Jan Kowalski", email: "jan.kowalski@firma.pl", department: "IT", role: "admin", status: "active" },
   { id: 2, name: "Anna Nowak", email: "anna.nowak@firma.pl", department: "Marketing", role: "user", status: "active" },
   { id: 3, name: "Piotr Wisniewski", email: "piotr.wisniewski@firma.pl", department: "Sales", role: "user", status: "active" },
@@ -77,7 +95,33 @@ const users = [
   { id: 5, name: "Tomasz Lewandowski", email: "tomasz.lewandowski@firma.pl", department: "Finance", role: "user", status: "active" },
 ]
 
-const resources = [
+const initialResources: Array<{
+  id: string
+  name: string
+  type: string
+  location: string
+  status: string
+  workflowStatus?: string | null
+  workflowReservationId?: string | null
+  workflowUser?: string | null
+  workflowDueDate?: string | null
+}> = []
+
+type AdminReservation = {
+  id: string
+  type: "desk" | "room"
+  name: string
+  location: string
+  date: string
+  status: string
+  startAt: string
+  endAt: string
+  userName: string
+  userEmail: string
+  meetingTitle?: string | null
+}
+
+const fallbackResources = [
   { id: 1, name: "Biurko A-01", type: "Biurko", location: "Strefa A, P1", status: "available" },
   { id: 2, name: "Sala Konferencyjna A", type: "Sala", location: "Pietro 1", status: "occupied" },
   { id: 3, name: "MacBook Pro 16\"", type: "Laptop", location: "Magazyn IT", status: "borrowed" },
@@ -93,36 +137,74 @@ const statIconByName: Record<string, any> = {
 }
 
 export default function AdminPage() {
-  const [statsData, setStatsData] = useState(stats)
-  const [usageDataState, setUsageDataState] = useState(usageData)
-  const [monthlyDataState, setMonthlyDataState] = useState(monthlyData)
-  const [pendingRequestsState, setPendingRequestsState] = useState(pendingRequests)
-  const [usersState, setUsersState] = useState(users)
-  const [resourcesState, setResourcesState] = useState(resources)
+  const [statsData, setStatsData] = useState(initialStats)
+  const [usageDataState, setUsageDataState] = useState(initialUsageData)
+  const [monthlyDataState, setMonthlyDataState] = useState(initialMonthlyData)
+  const [pendingRequestsState, setPendingRequestsState] = useState(initialPendingRequests)
+  const [usersState, setUsersState] = useState(initialUsers)
+  const [resourcesState, setResourcesState] = useState(initialResources)
   const [showAddResourceDialog, setShowAddResourceDialog] = useState(false)
   const [showAddUserDialog, setShowAddUserDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [reservationSearchQuery, setReservationSearchQuery] = useState("")
+  const [filterFromDate, setFilterFromDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [filterToDate, setFilterToDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [filterFromTime, setFilterFromTime] = useState("00:00")
+  const [filterToTime, setFilterToTime] = useState("23:59")
+  const [deskReservationsState, setDeskReservationsState] = useState<AdminReservation[]>([])
+  const [roomReservationsState, setRoomReservationsState] = useState<AdminReservation[]>([])
+  const [loadingReservations, setLoadingReservations] = useState(false)
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
     department: "",
   })
 
+  const loadAdminReservations = async () => {
+    setLoadingReservations(true)
+
+    const query = new URLSearchParams({
+      fromDate: filterFromDate,
+      toDate: filterToDate,
+      fromTime: filterFromTime,
+      toTime: filterToTime,
+    })
+
+    const [deskResponse, roomResponse] = await Promise.all([
+      fetch(`/api/admin/reservations?type=desk&${query.toString()}`, { cache: "no-store" }),
+      fetch(`/api/admin/reservations?type=room&${query.toString()}`, { cache: "no-store" }),
+    ])
+
+    if (deskResponse.ok) {
+      setDeskReservationsState(await deskResponse.json())
+    }
+
+    if (roomResponse.ok) {
+      setRoomReservationsState(await roomResponse.json())
+    }
+
+    setLoadingReservations(false)
+  }
+
   const loadOverview = async () => {
     const response = await fetch('/api/admin/overview', { cache: 'no-store' })
     if (!response.ok) return
     const data = await response.json()
-    setStatsData(data.stats || stats)
-    setUsageDataState(data.usageData || usageData)
-    setMonthlyDataState(data.monthlyData || monthlyData)
-    setPendingRequestsState(data.pendingRequests || pendingRequests)
-    setUsersState(data.users || users)
-    setResourcesState(data.resources || resources)
+    setStatsData(data.stats || fallbackStats)
+    setUsageDataState(data.usageData || fallbackUsageData)
+    setMonthlyDataState(data.monthlyData || fallbackMonthlyData)
+    setPendingRequestsState(data.pendingRequests || fallbackPendingRequests)
+    setUsersState(data.users || fallbackUsers)
+    setResourcesState(data.resources || fallbackResources)
   }
 
   useEffect(() => {
     loadOverview()
   }, [])
+
+  useEffect(() => {
+    loadAdminReservations()
+  }, [filterFromDate, filterToDate, filterFromTime, filterToTime])
 
   const handleAddUser = async () => {
     const response = await fetch('/api/admin/users', {
@@ -164,12 +246,114 @@ export default function AdminPage() {
     await loadOverview()
   }
 
-  const handleApprove = (id: number) => {
-    console.log("[v0] Approved request:", id)
+  const handleDeleteUser = async (userId: string) => {
+    const response = await fetch(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) return
+    await loadOverview()
   }
 
-  const handleReject = (id: number) => {
-    console.log("[v0] Rejected request:", id)
+  const handleApprove = async (id: string | number) => {
+    const response = await fetch(`/api/admin/requests/${id}/decision`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approve' }),
+    })
+
+    if (!response.ok) return
+    await loadOverview()
+  }
+
+  const handleReject = async (id: string | number) => {
+    const response = await fetch(`/api/admin/requests/${id}/decision`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'reject' }),
+    })
+
+    if (!response.ok) return
+    await loadOverview()
+  }
+
+  const handleIssueResource = async (resourceId: string) => {
+    const response = await fetch(`/api/admin/resources/${resourceId}/lifecycle`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'issue' }),
+    })
+
+    if (!response.ok) return
+    await loadOverview()
+  }
+
+  const handleReturnResource = async (resourceId: string) => {
+    const response = await fetch(`/api/admin/resources/${resourceId}/lifecycle`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'return' }),
+    })
+
+    if (!response.ok) return
+    await loadOverview()
+  }
+
+  const handleCancelReservation = async (reservationId: string) => {
+    const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
+      method: "PATCH",
+    })
+
+    if (!response.ok) return
+
+    await Promise.all([loadOverview(), loadAdminReservations()])
+  }
+
+  const filteredResources = resourcesState.filter((resource) => {
+    if (!searchQuery.trim()) {
+      return true
+    }
+
+    const query = searchQuery.toLowerCase()
+    return (
+      resource.name.toLowerCase().includes(query) ||
+      resource.type.toLowerCase().includes(query) ||
+      resource.location.toLowerCase().includes(query)
+    )
+  })
+
+  const filterReservationRows = (rows: AdminReservation[]) => {
+    if (!reservationSearchQuery.trim()) {
+      return rows
+    }
+
+    const query = reservationSearchQuery.toLowerCase()
+    return rows.filter((reservation) => {
+      return (
+        reservation.name.toLowerCase().includes(query) ||
+        reservation.location.toLowerCase().includes(query) ||
+        reservation.userName.toLowerCase().includes(query) ||
+        reservation.userEmail.toLowerCase().includes(query)
+      )
+    })
+  }
+
+  const formatDateLabel = (value: string) => {
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.valueOf())) {
+      return value
+    }
+
+    return parsed.toLocaleDateString("pl-PL")
+  }
+
+  const formatTimeLabel = (value: string) => {
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.valueOf())) {
+      return "--:--"
+    }
+
+    return parsed.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })
   }
 
   return (
@@ -185,10 +369,6 @@ export default function AdminPage() {
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Eksportuj raport
-          </Button>
-          <Button onClick={() => setShowAddResourceDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Dodaj zasob
           </Button>
         </div>
       </div>
@@ -300,7 +480,9 @@ export default function AdminPage() {
                 <TableHead>Uzytkownik</TableHead>
                 <TableHead>Typ</TableHead>
                 <TableHead>Zasob</TableHead>
+                <TableHead>Cel</TableHead>
                 <TableHead>Data wniosku</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Akcje</TableHead>
               </TableRow>
             </TableHeader>
@@ -312,7 +494,13 @@ export default function AdminPage() {
                     <Badge variant="outline">{request.type}</Badge>
                   </TableCell>
                   <TableCell>{request.item}</TableCell>
+                  <TableCell>{request.purpose || "-"}</TableCell>
                   <TableCell>{request.date}</TableCell>
+                  <TableCell>
+                    <Badge variant={request.status === "pending" ? "secondary" : "outline"}>
+                      {request.status === "pending" ? "Oczekuje" : request.status}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button
@@ -320,6 +508,7 @@ export default function AdminPage() {
                         variant="outline"
                         className="text-accent hover:bg-accent/10"
                         onClick={() => handleApprove(request.id)}
+                        disabled={request.status !== "pending"}
                       >
                         <CheckCircle className="h-4 w-4" />
                       </Button>
@@ -328,6 +517,7 @@ export default function AdminPage() {
                         variant="outline"
                         className="text-destructive hover:bg-destructive/10"
                         onClick={() => handleReject(request.id)}
+                        disabled={request.status !== "pending"}
                       >
                         <XCircle className="h-4 w-4" />
                       </Button>
@@ -343,6 +533,14 @@ export default function AdminPage() {
       {/* Tabs for Users and Resources */}
       <Tabs defaultValue="resources">
         <TabsList>
+          <TabsTrigger value="desks">
+            <Monitor className="h-4 w-4 mr-2" />
+            Biurka
+          </TabsTrigger>
+          <TabsTrigger value="rooms">
+            <Calendar className="h-4 w-4 mr-2" />
+            Sale
+          </TabsTrigger>
           <TabsTrigger value="resources">
             <Package className="h-4 w-4 mr-2" />
             Zasoby
@@ -353,22 +551,191 @@ export default function AdminPage() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="desks" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <CardTitle>Rezerwacje biurek</CardTitle>
+                  <CardDescription>Wyszukaj rezerwacje po przedziale dat i godzin oraz anuluj je.</CardDescription>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+                  <Input type="date" value={filterFromDate} onChange={(event) => setFilterFromDate(event.target.value)} />
+                  <Input type="date" value={filterToDate} onChange={(event) => setFilterToDate(event.target.value)} />
+                  <Input type="time" value={filterFromTime} onChange={(event) => setFilterFromTime(event.target.value)} />
+                  <Input type="time" value={filterToTime} onChange={(event) => setFilterToTime(event.target.value)} />
+                  <Input
+                    placeholder="Szukaj uzytkownika lub biurka"
+                    value={reservationSearchQuery}
+                    onChange={(event) => setReservationSearchQuery(event.target.value)}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Biurko</TableHead>
+                    <TableHead>Uzytkownik</TableHead>
+                    <TableHead>Lokalizacja</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Godziny</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Akcje</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {!loadingReservations && filterReservationRows(deskReservationsState).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        Brak rezerwacji biurek dla wybranego przedzialu.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {filterReservationRows(deskReservationsState).map((reservation) => (
+                    <TableRow key={reservation.id}>
+                      <TableCell className="font-medium">{reservation.name}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p>{reservation.userName}</p>
+                          <p className="text-xs text-muted-foreground">{reservation.userEmail}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{reservation.location}</TableCell>
+                      <TableCell>{formatDateLabel(reservation.date)}</TableCell>
+                      <TableCell>{formatTimeLabel(reservation.startAt)} - {formatTimeLabel(reservation.endAt)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{reservation.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:bg-destructive/10"
+                          onClick={() => handleCancelReservation(reservation.id)}
+                          disabled={["cancelled", "completed", "rejected"].includes(reservation.status)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Anuluj
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rooms" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <CardTitle>Rezerwacje sal</CardTitle>
+                  <CardDescription>Wyszukaj rezerwacje po przedziale dat i godzin oraz anuluj je.</CardDescription>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+                  <Input type="date" value={filterFromDate} onChange={(event) => setFilterFromDate(event.target.value)} />
+                  <Input type="date" value={filterToDate} onChange={(event) => setFilterToDate(event.target.value)} />
+                  <Input type="time" value={filterFromTime} onChange={(event) => setFilterFromTime(event.target.value)} />
+                  <Input type="time" value={filterToTime} onChange={(event) => setFilterToTime(event.target.value)} />
+                  <Input
+                    placeholder="Szukaj uzytkownika lub sali"
+                    value={reservationSearchQuery}
+                    onChange={(event) => setReservationSearchQuery(event.target.value)}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sala</TableHead>
+                    <TableHead>Uzytkownik</TableHead>
+                    <TableHead>Lokalizacja</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Godziny</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Akcje</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {!loadingReservations && filterReservationRows(roomReservationsState).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        Brak rezerwacji sal dla wybranego przedzialu.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {filterReservationRows(roomReservationsState).map((reservation) => (
+                    <TableRow key={reservation.id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <p>{reservation.name}</p>
+                          {reservation.meetingTitle && (
+                            <p className="text-xs text-muted-foreground">{reservation.meetingTitle}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p>{reservation.userName}</p>
+                          <p className="text-xs text-muted-foreground">{reservation.userEmail}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{reservation.location}</TableCell>
+                      <TableCell>{formatDateLabel(reservation.date)}</TableCell>
+                      <TableCell>{formatTimeLabel(reservation.startAt)} - {formatTimeLabel(reservation.endAt)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{reservation.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:bg-destructive/10"
+                          onClick={() => handleCancelReservation(reservation.id)}
+                          disabled={["cancelled", "completed", "rejected"].includes(reservation.status)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Anuluj
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="resources" className="mt-6">
           <Card>
             <CardHeader>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <CardTitle>Zarzadzanie zasobami</CardTitle>
-                  <CardDescription>Lista wszystkich zasobow w systemie</CardDescription>
+                  <CardDescription>
+                    Lista zasobow sprzetowych. Biurka i sale dodajesz oraz edytujesz w edytorze pietra.
+                  </CardDescription>
                 </div>
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Szukaj zasobu..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
+                <div className="flex w-full md:w-auto gap-3">
+                  <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Szukaj zasobu..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Button onClick={() => setShowAddResourceDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Dodaj zasob
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -380,11 +747,12 @@ export default function AdminPage() {
                     <TableHead>Typ</TableHead>
                     <TableHead>Lokalizacja</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Workflow</TableHead>
                     <TableHead className="text-right">Akcje</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {resourcesState.map((resource) => (
+                  {filteredResources.map((resource) => (
                     <TableRow key={resource.id}>
                       <TableCell className="font-medium">{resource.name}</TableCell>
                       <TableCell>
@@ -400,24 +768,55 @@ export default function AdminPage() {
                            resource.status === "occupied" ? "Zajety" : "Wypozyczony"}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        {resource.workflowStatus ? (
+                          <div className="space-y-1">
+                            <Badge variant="outline">
+                              {resource.workflowStatus === "pending" && "Wniosek oczekuje"}
+                              {resource.workflowStatus === "approved" && "Gotowe do wydania"}
+                              {resource.workflowStatus === "issued" && "Wydane"}
+                              {!['pending', 'approved', 'issued'].includes(resource.workflowStatus) && resource.workflowStatus}
+                            </Badge>
+                            {resource.workflowUser && (
+                              <p className="text-xs text-muted-foreground">{resource.workflowUser}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Brak aktywnego obiegu</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
+                        <div className="flex justify-end gap-2">
+                          {resource.workflowStatus === "approved" && (
+                            <Button size="sm" onClick={() => handleIssueResource(String(resource.id))}>
+                              Wydaj
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edytuj
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Usun
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                          )}
+                          {resource.workflowStatus === "issued" && (
+                            <Button size="sm" variant="outline" onClick={() => handleReturnResource(String(resource.id))}>
+                              Zwrot
+                            </Button>
+                          )}
+                          {resource.workflowStatus !== "approved" && resource.workflowStatus !== "issued" && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edytuj
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Usun
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -496,7 +895,7 @@ export default function AdminPage() {
                               <Edit className="h-4 w-4 mr-2" />
                               Edytuj
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(String(user.id))}>
                               <Trash2 className="h-4 w-4 mr-2" />
                               Usun
                             </DropdownMenuItem>
@@ -518,7 +917,7 @@ export default function AdminPage() {
           <DialogHeader>
             <DialogTitle>Dodaj nowy zasob</DialogTitle>
             <DialogDescription>
-              Wprowadz dane nowego zasobu
+              Dodawanie biurek i sal odbywa sie w edytorze pietra. Tutaj dodajesz zasoby sprzetowe.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
@@ -537,8 +936,6 @@ export default function AdminPage() {
                     <SelectValue placeholder="Wybierz typ" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="desk">Biurko</SelectItem>
-                    <SelectItem value="room">Sala konferencyjna</SelectItem>
                     <SelectItem value="laptop">Laptop</SelectItem>
                     <SelectItem value="monitor">Monitor</SelectItem>
                     <SelectItem value="projector">Projektor</SelectItem>

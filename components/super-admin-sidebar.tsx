@@ -36,6 +36,20 @@ export function SuperAdminSidebar() {
     email: user?.primaryEmailAddress?.emailAddress || "admin@deskflow.io",
   }
 
+  const handleSignOut = async () => {
+    await fetch('/api/superadmin/impersonation', {
+      method: 'DELETE',
+    })
+
+    await fetch('/api/auth/active-company', {
+      method: 'DELETE',
+    })
+
+    localStorage.removeItem("superadminImpersonation")
+    localStorage.removeItem("companyBranding")
+    await signOut()
+  }
+
   return (
     <aside className="flex h-screen w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-white border-r border-slate-700">
       <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700">
@@ -86,7 +100,7 @@ export function SuperAdminSidebar() {
             variant="ghost"
             size="icon"
             className="text-slate-400 hover:text-white hover:bg-white/10"
-            onClick={() => signOut()}
+            onClick={handleSignOut}
           >
             <LogOut className="h-4 w-4" />
           </Button>

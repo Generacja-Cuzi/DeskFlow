@@ -1,450 +1,615 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Users, Eye, List, Clock, Tv } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import { format } from "date-fns"
 import { pl } from "date-fns/locale"
-import { cn } from "@/lib/utils"
+import { Building2, CalendarIcon, Clock, Users } from "lucide-react"
+
 import { InteractiveFloorPlan } from "@/components/interactive-floor-plan"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useReservation } from "@/lib/contexts/reservation-context"
-import { useBranding } from "@/lib/contexts/branding-context"
+import type { FloorElement } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+type BusySlot = {
+  startAt: string
+  endAt: string
+  userName: string | null
+  title: string | null
+}
+
+type RoomReservationDraft = {
+  roomId: string
+  name: string
+  floor: number
+  capacity: number
+  busySlots: BusySlot[]
+}
+
+const DAY_START = "07:00"
+const DAY_END = "20:00"
+
+const timeOptions = Array.from({ length: 27 }, (_, index) => {
+  const totalMinutes = 7 * 60 + index * 30
+  const hour = String(Math.floor(totalMinutes / 60)).padStart(2, "0")
+  const minute = String(totalMinutes % 60).padStart(2, "0")
+  return `${hour}:${minute}`
+})
+
+function toDateString(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function toMinutes(value: string) {
+  const [hour, minute] = value.split(":").map(Number)
+  return hour * 60 + minute
+}
+
+function fromMinutes(totalMinutes: number) {
+  const hour = String(Math.floor(totalMinutes / 60)).padStart(2, "0")
+  const minute = String(totalMinutes % 60).padStart(2, "0")
+  return `${hour}:${minute}`
+}
+
+function toHourLabel(value: string) {
+  return new Date(value).toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function busySlotToInterval(slot: BusySlot, dayStart: string, dayEnd: string) {
+  const dayStartMinutes = toMinutes(dayStart)
+  const dayEndMinutes = toMinutes(dayEnd)
+
+  const startLabel = toHourLabel(slot.startAt)
+  const endLabel = toHourLabel(slot.endAt)
+
+  const start = toMinutes(startLabel)
+  let end = toMinutes(endLabel)
+
+  if (end <= start) {
+    end = dayEndMinutes
+  }
+
+  const clampedStart = Math.max(dayStartMinutes, Math.min(start, dayEndMinutes))
+  const clampedEnd = Math.max(dayStartMinutes, Math.min(end, dayEndMinutes))
+
+  if (clampedEnd <= clampedStart) {
+    return null
+  }
+
+  return { start: clampedStart, end: clampedEnd }
+}
+
+function isOverlapping(startA: string, endA: string, startB: string, endB: string) {
+  const aStart = toMinutes(startA)
+  const aEnd = toMinutes(endA)
+  const bStart = toMinutes(startB)
+  const bEnd = toMinutes(endB)
+  return aStart < bEnd && bStart < aEnd
+}
+
+function getFreeIntervals(busySlots: BusySlot[]) {
+  const sorted = [...busySlots]
+    .map((slot) => busySlotToInterval(slot, DAY_START, DAY_END))
+    .filter((slot): slot is { start: number; end: number } => Boolean(slot))
+    .sort((a, b) => a.start - b.start)
+
+  const merged: Array<{ start: number; end: number }> = []
+
+  for (const slot of sorted) {
+    if (!merged.length || slot.start > merged[merged.length - 1].end) {
+      merged.push({ ...slot })
+      continue
+    }
+
+    merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, slot.end)
+  }
+
+  const free: Array<{ start: string; end: string }> = []
+  const dayStartMinutes = toMinutes(DAY_START)
+  const dayEndMinutes = toMinutes(DAY_END)
+
+  let cursor = dayStartMinutes
+
+  for (const slot of merged) {
+    if (slot.start > cursor) {
+      free.push({ start: fromMinutes(cursor), end: fromMinutes(slot.start) })
+    }
+
+    cursor = Math.max(cursor, slot.end)
+  }
+
+  if (cursor < dayEndMinutes) {
+    free.push({ start: fromMinutes(cursor), end: fromMinutes(dayEndMinutes) })
+  }
+
+  return free.filter((interval) => toMinutes(interval.end) - toMinutes(interval.start) >= 30)
+}
 
 export default function SalePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [selectedTime, setSelectedTime] = useState<string>("09:00 - 10:00")
-  const [viewMode, setViewMode] = useState<"floorplan" | "list">("floorplan")
-  
-  const { rooms, currentFloor } = useReservation()
-  const { branding } = useBranding()
+  const [startTime, setStartTime] = useState("09:00")
+  const [endTime, setEndTime] = useState("10:00")
+  const [meetingTitle, setMeetingTitle] = useState("Spotkanie")
+  const [participantCount, setParticipantCount] = useState(2)
+  const [availability, setAvailability] = useState<Record<string, BusySlot[]>>({})
+  const [submittingRoomId, setSubmittingRoomId] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [reservationDraft, setReservationDraft] = useState<RoomReservationDraft | null>(null)
+  const [viewMode, setViewMode] = useState("map")
 
-  // Filter rooms for current floor
-  const currentFloorRooms = rooms.filter(room => room.floor === currentFloor)
-  
-  // Statistics for the selected time slot
-  const availableCount = currentFloorRooms.filter(room => 
-    room.timeSlots.some(slot => slot.time === selectedTime && slot.available)
-  ).length
-  
-  const occupiedCount = currentFloorRooms.filter(room =>
-    room.timeSlots.some(slot => slot.time === selectedTime && !slot.available)
-  ).length
-  
-  const totalCount = currentFloorRooms.length
+  const { rooms, currentFloor, floorPlans, setCurrentFloor } = useReservation()
 
-  // Common time slots
-  const timeSlots = [
-    "08:00 - 09:00",
-    "09:00 - 10:00", 
-    "10:00 - 11:00",
-    "11:00 - 12:00",
-    "12:00 - 13:00",
-    "13:00 - 14:00",
-    "14:00 - 15:00",
-    "15:00 - 16:00",
-    "16:00 - 17:00",
-  ]
+  const selectedDateString = useMemo(() => toDateString(selectedDate), [selectedDate])
 
-  const getCapacityBadge = (capacity: number) => {
-    if (capacity <= 4) {
-      return <Badge variant="outline" className="text-xs">Mała ({capacity} os.)</Badge>
-    } else if (capacity <= 10) {
-      return <Badge variant="outline" className="text-xs">Średnia ({capacity} os.)</Badge>
-    } else {
-      return <Badge variant="outline" className="text-xs">Duża ({capacity} os.)</Badge>
+  const currentFloorRooms = useMemo(
+    () => rooms.filter((room) => room.floor === currentFloor),
+    [rooms, currentFloor]
+  )
+
+  const hasInvalidRange = toMinutes(endTime) <= toMinutes(startTime)
+
+  const loadAvailability = async () => {
+    const response = await fetch(`/api/reservations/availability?type=room&date=${selectedDateString}`, {
+      cache: "no-store",
+    })
+
+    if (!response.ok) {
+      setAvailability({})
+      return
+    }
+
+    const payload = await response.json()
+    setAvailability(payload.targets || {})
+  }
+
+  useEffect(() => {
+    loadAvailability()
+  }, [selectedDateString])
+
+  const roomState = currentFloorRooms.map((room) => {
+    const slots = availability[room.id] || []
+    const busyIntervals = slots
+      .map((slot) => {
+        const interval = busySlotToInterval(slot, DAY_START, DAY_END)
+        if (!interval) {
+          return null
+        }
+
+        return {
+          start: fromMinutes(interval.start),
+          end: fromMinutes(interval.end),
+          userName: slot.userName,
+          title: slot.title,
+        }
+      })
+      .filter((slot): slot is { start: string; end: string; userName: string | null; title: string | null } => Boolean(slot))
+
+    const requestedIntervalIsBusy = busyIntervals.some((slot) =>
+      isOverlapping(startTime, endTime, slot.start, slot.end)
+    )
+
+    const overCapacity = participantCount > room.capacity
+
+    return {
+      room,
+      busyIntervals,
+      busySlots: slots,
+      isAvailableForSelectedRange: !requestedIntervalIsBusy && !overCapacity,
+      overCapacity,
+    }
+  })
+
+  const availableCount = roomState.filter((item) => item.isAvailableForSelectedRange).length
+  const occupiedCount = roomState.length - availableCount
+
+  const openRoomDialog = (roomId: string) => {
+    const room = currentFloorRooms.find((item) => item.id === roomId)
+    if (!room) {
+      return
+    }
+
+    setReservationDraft({
+      roomId,
+      name: room.name,
+      floor: room.floor,
+      capacity: room.capacity,
+      busySlots: availability[roomId] || [],
+    })
+    setDialogOpen(true)
+  }
+
+  const handleMapElementClick = (element: FloorElement) => {
+    if (element.type !== "room") {
+      return
+    }
+
+    openRoomDialog(element.id)
+  }
+
+  const reserveRoom = async (roomId: string, rangeStart = startTime, rangeEnd = endTime) => {
+    if (toMinutes(rangeEnd) <= toMinutes(rangeStart)) {
+      return
+    }
+
+    setSubmittingRoomId(roomId)
+
+    const response = await fetch("/api/reservations/room", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId,
+        date: selectedDateString,
+        startTime: rangeStart,
+        endTime: rangeEnd,
+        meetingTitle,
+        participantCount,
+      }),
+    })
+
+    setSubmittingRoomId(null)
+
+    if (response.ok) {
+      setDialogOpen(false)
+      await loadAvailability()
     }
   }
 
-  const getRoomStatusForTime = (room: any, timeSlot: string) => {
-    const slot = room.timeSlots.find((s: any) => s.time === timeSlot)
-    return slot?.available ? "available" : "occupied"
-  }
+  const freeIntervals = useMemo(() => {
+    if (!reservationDraft) {
+      return []
+    }
+
+    return getFreeIntervals(reservationDraft.busySlots)
+  }, [reservationDraft])
+
+  const draftOverCapacity = reservationDraft ? participantCount > reservationDraft.capacity : false
+  const draftConflict = reservationDraft
+    ? reservationDraft.busySlots.some((slot) => {
+        const interval = busySlotToInterval(slot, DAY_START, DAY_END)
+        if (!interval) {
+          return false
+        }
+
+        return isOverlapping(
+          startTime,
+          endTime,
+          fromMinutes(interval.start),
+          fromMinutes(interval.end)
+        )
+      })
+    : true
 
   return (
-    <div className="p-4 md:p-6 lg:p-8">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-3">
             <Users className="h-7 w-7 text-primary" />
-            Sale konferencyjne
+            Rezerwacja sal konferencyjnych
           </h1>
           <p className="text-muted-foreground mt-1">
-            Zarezerwuj salę konferencyjną na interaktywnym planie piętra
+            Rezerwuj sale z mapy albo z listy. Klikniecie zajetej sali pozwala ustawic rezerwacje od pierwszego wolnego okna.
           </p>
         </div>
 
-        {/* Date, Time and View Controls */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Date picker */}
+        <div className="flex flex-wrap gap-3">
+          <Select value={String(currentFloor)} onValueChange={(value) => setCurrentFloor(Number(value))}>
+            <SelectTrigger className="w-[170px]">
+              <Building2 className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {floorPlans.map((plan) => (
+                <SelectItem key={plan.id} value={String(plan.floorNumber)}>
+                  {plan.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className={cn(
-                  "w-full sm:w-[220px] justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground"
-                )}
+                className={cn("w-[220px] justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? (
-                  format(selectedDate, "PPP", { locale: pl })
-                ) : (
-                  <span>Wybierz datę</span>
-                )}
+                {format(selectedDate, "PPP", { locale: pl })}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                disabled={(date) =>
-                  date < new Date() || date < new Date("1900-01-01")
-                }
-                initialFocus
-              />
+              <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
             </PopoverContent>
           </Popover>
 
-          {/* Time slot selector */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-[180px] justify-start">
-                <Clock className="mr-2 h-4 w-4" />
-                {selectedTime}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="p-2">
-                <div className="grid gap-1">
-                  {timeSlots.map((slot) => (
-                    <Button
-                      key={slot}
-                      variant={selectedTime === slot ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setSelectedTime(slot)}
-                      className="justify-start"
-                    >
-                      {slot}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <Select value={startTime} onValueChange={setStartTime}>
+            <SelectTrigger className="w-[130px]">
+              <Clock className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {timeOptions.map((time) => (
+                <SelectItem key={time} value={time}>
+                  {time}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          {/* View mode toggle */}
-          <div className="flex items-center border rounded-lg w-full sm:w-auto">
-            <Button
-              variant={viewMode === "floorplan" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("floorplan")}
-              className="rounded-r-none"
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              Plan piętra
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="rounded-l-none"
-            >
-              <List className="h-4 w-4 mr-2" />
-              Lista
-            </Button>
-          </div>
+          <Select value={endTime} onValueChange={setEndTime}>
+            <SelectTrigger className="w-[130px]">
+              <Clock className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {timeOptions.map((time) => (
+                <SelectItem key={time} value={time}>
+                  {time}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card className="overflow-hidden">
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div 
-                className="h-12 w-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: branding.secondaryColor }}
-              >
-                <Users className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Dostępne ({selectedTime})
-                </p>
-                <p className="text-2xl font-bold">{availableCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Card>
+        <CardContent className="pt-6 grid gap-3 md:grid-cols-2">
+          <Input value={meetingTitle} onChange={(event) => setMeetingTitle(event.target.value)} placeholder="Tytul spotkania" />
+          <Input
+            type="number"
+            min={1}
+            value={participantCount}
+            onChange={(event) => setParticipantCount(Number(event.target.value) || 1)}
+            placeholder="Liczba uczestnikow"
+          />
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 rounded-full bg-red-500 flex items-center justify-center">
-                <Users className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Zajęte ({selectedTime})
-                </p>
-                <p className="text-2xl font-bold">{occupiedCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <Users className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Łącznie sal</p>
-                <p className="text-2xl font-bold">{totalCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content */}
-      {viewMode === "floorplan" ? (
-        /* Interactive Floor Plan View */
-        <InteractiveFloorPlan
-          mode="reservation"
-          showReservationStatus={true}
-          enableReservation={true}
-          className="space-y-6"
-        />
-      ) : (
-        /* List View */
-        <Card>
-          <CardHeader>
-            <CardTitle>Lista sal konferencyjnych</CardTitle>
-            <CardDescription>
-              Wszystkie sale na piętrze {currentFloor} - {selectedTime}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {currentFloorRooms.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium">Brak sal na tym piętrze</p>
-                  <p className="text-muted-foreground">
-                    Sprawdź inne piętra lub skontaktuj się z administratorem
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-6">
-                  {currentFloorRooms.map((room) => {
-                    const isAvailable = getRoomStatusForTime(room, selectedTime) === "available"
-                    const timeSlot = room.timeSlots.find(s => s.time === selectedTime)
-                    
-                    return (
-                      <div
-                        key={room.id}
-                        className={cn(
-                          "border rounded-lg p-6 transition-colors",
-                          isAvailable ? "hover:bg-muted/50" : "bg-muted/20"
-                        )}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-4 min-w-0">
-                            <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                              <Users className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <div className="space-y-2 min-w-0">
-                              <div>
-                                <h3 className="text-lg font-semibold truncate">{room.name}</h3>
-                                <p className="text-muted-foreground">
-                                  Pietro {room.floor} • {selectedTime}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                {getCapacityBadge(room.capacity)}
-                                <Badge
-                                  className="text-white"
-                                  style={{ 
-                                    backgroundColor: isAvailable ? branding.secondaryColor : "#ef4444"
-                                  }}
-                                >
-                                  {isAvailable ? "Dostępna" : "Zajęta"}
-                                </Badge>
-                              </div>
-
-                              {/* Equipment */}
-                              <div className="flex items-center gap-1 flex-wrap">
-                                {room.equipment.slice(0, 3).map((item, index) => (
-                                  <Badge key={index} variant="outline" className="text-xs">
-                                    {item}
-                                  </Badge>
-                                ))}
-                                {room.equipment.length > 3 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{room.equipment.length - 3}
-                                  </Badge>
-                                )}
-                              </div>
-
-                              {/* Booking info */}
-                              {!isAvailable && timeSlot?.bookedBy && (
-                                <p className="text-sm text-muted-foreground">
-                                  Zarezerwowane przez: {timeSlot.bookedBy}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                            {/* Time slots preview */}
-                            <div className="hidden lg:flex items-center gap-1">
-                              {room.timeSlots.slice(0, 5).map((slot, index) => (
-                                <div
-                                  key={index}
-                                  className={cn(
-                                    "h-6 w-6 rounded text-xs flex items-center justify-center font-medium",
-                                    slot.available
-                                      ? "bg-green-100 text-green-700"
-                                      : "bg-red-100 text-red-700",
-                                    slot.time === selectedTime && "ring-2 ring-primary"
-                                  )}
-                                >
-                                  {slot.available ? "✓" : "✗"}
-                                </div>
-                              ))}
-                            </div>
-
-                            <Button
-                              disabled={!isAvailable}
-                              onClick={() => {
-                                // Could open reservation dialog here
-                                console.log("Reserve room:", room.id, selectedTime)
-                              }}
-                            >
-                              {isAvailable ? "Zarezerwuj" : "Zajęta"}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+      {hasInvalidRange && (
+        <Card className="border-destructive/40">
+          <CardContent className="pt-6 text-sm text-destructive">
+            Godzina konca musi byc pozniejsza niz godzina startu.
           </CardContent>
         </Card>
       )}
 
-      {/* Time Slots Overview */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Dostępność sal - cały dzień
-          </CardTitle>
-          <CardDescription>
-            Szybki podgląd dostępności wszystkich sal w ciągu dnia
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {currentFloorRooms.map((room) => (
-              <div key={room.id} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h4 className="font-medium">{room.name}</h4>
-                    {getCapacityBadge(room.capacity)}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Dostepne w wybranym zakresie</p>
+            <p className="text-2xl font-bold mt-1">{availableCount}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Niedostepne</p>
+            <p className="text-2xl font-bold mt-1">{occupiedCount}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Lacznie sal na pietrze</p>
+            <p className="text-2xl font-bold mt-1">{roomState.length}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs value={viewMode} onValueChange={setViewMode}>
+        <TabsList>
+          <TabsTrigger value="map">Mapa</TabsTrigger>
+          <TabsTrigger value="list">Lista</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="map" className="mt-4">
+          <InteractiveFloorPlan
+            mode="reservation"
+            enableReservation={false}
+            clickableTypes={["room"]}
+            availabilityByTarget={availability}
+            selectedRange={{ startTime, endTime }}
+            onElementClick={handleMapElementClick}
+          />
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dostepnosc sal</CardTitle>
+              <CardDescription>
+                Zakres: {startTime} - {endTime}, {format(selectedDate, "d MMMM yyyy", { locale: pl })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {roomState.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">Brak sal na tym pietrze.</div>
+              )}
+
+              {roomState.map(({ room, busyIntervals, isAvailableForSelectedRange, overCapacity }) => (
+                <div key={room.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold">{room.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Pietro {room.floor} • Pojemnosc: {room.capacity}
+                      </p>
+                    </div>
+
+                    <Badge variant={isAvailableForSelectedRange ? "default" : "secondary"}>
+                      {isAvailableForSelectedRange ? "Dostepna" : overCapacity ? "Za mala pojemnosc" : "Zajeta w wybranym czasie"}
+                    </Badge>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {busyIntervals.length === 0 && (
+                      <Badge variant="outline">Brak rezerwacji w tym dniu</Badge>
+                    )}
+                    {busyIntervals.map((slot, index) => (
+                      <Badge key={`${room.id}-${index}`} variant="outline">
+                        {slot.start} - {slot.end}{slot.title ? ` • ${slot.title}` : ""}
+                      </Badge>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => (isAvailableForSelectedRange ? reserveRoom(room.id) : openRoomDialog(room.id))}
+                      disabled={hasInvalidRange || overCapacity || submittingRoomId === room.id}
+                    >
+                      {submittingRoomId === room.id
+                        ? "Rezerwowanie..."
+                        : isAvailableForSelectedRange
+                          ? "Zarezerwuj sale"
+                          : "Rezerwuj po zwolnieniu"}
+                    </Button>
                   </div>
                 </div>
-                <div className="grid grid-cols-9 gap-1">
-                  {room.timeSlots.map((slot, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "h-8 rounded text-xs flex items-center justify-center font-medium cursor-pointer transition-colors",
-                        slot.available
-                          ? "bg-green-100 text-green-700 hover:bg-green-200"
-                          : "bg-red-100 text-red-700",
-                        slot.time === selectedTime && "ring-2 ring-primary"
-                      )}
-                      onClick={() => setSelectedTime(slot.time)}
-                      title={slot.available ? `${slot.time} - Dostępna` : `${slot.time} - ${slot.bookedBy}`}
-                    >
-                      {slot.time.split(" - ")[0].substring(0, 5)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="flex items-center gap-6 mt-6 pt-4 border-t">
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 bg-green-100 rounded" />
-              <span className="text-sm">Dostępne</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 bg-red-100 rounded" />
-              <span className="text-sm">Zajęte</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 border-2 border-primary rounded" />
-              <span className="text-sm">Wybrany czas</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Quick Help */}
-      <Card className="mt-8">
-        <CardContent className="pt-6">
-          <h3 className="font-medium mb-3">Jak zarezerwować salę konferencyjną?</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div className="flex items-start gap-3">
-              <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
-                1
-              </div>
-              <div>
-                <p className="font-medium">Wybierz datę i godzinę</p>
-                <p className="text-muted-foreground">
-                  Ustaw datę spotkania i preferowaną godzinę
-                </p>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Wybierz godziny rezerwacji sali</DialogTitle>
+            <DialogDescription>
+              {reservationDraft
+                ? `${reservationDraft.name} • Pietro ${reservationDraft.floor} • Pojemnosc ${reservationDraft.capacity}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Zajete przedzialy</p>
+              <div className="flex flex-wrap gap-2">
+                {!reservationDraft || reservationDraft.busySlots.length === 0 ? (
+                  <Badge variant="outline">Brak rezerwacji</Badge>
+                ) : (
+                  reservationDraft.busySlots
+                    .sort((a, b) => a.startAt.localeCompare(b.startAt))
+                    .map((slot, index) => {
+                      const interval = busySlotToInterval(slot, DAY_START, DAY_END)
+                      if (!interval) {
+                        return null
+                      }
+
+                      return (
+                        <Badge key={`${slot.startAt}-${index}`} variant="secondary">
+                          {fromMinutes(interval.start)} - {fromMinutes(interval.end)}{slot.title ? ` • ${slot.title}` : ""}
+                        </Badge>
+                      )
+                    })
+                )}
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
-                2
-              </div>
-              <div>
-                <p className="font-medium">Znajdź dostępną salę</p>
-                <p className="text-muted-foreground">
-                  Sprawdź plan piętra lub listę sal pod kątem pojemności i wyposażenia
-                </p>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Wolne przedzialy (kliknij aby ustawic)</p>
+              <div className="flex flex-wrap gap-2">
+                {freeIntervals.length === 0 ? (
+                  <Badge variant="outline">Brak wolnych przedzialow</Badge>
+                ) : (
+                  freeIntervals.map((interval, index) => (
+                    <Button
+                      key={`${interval.start}-${interval.end}-${index}`}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setStartTime(interval.start)
+                        setEndTime(interval.end)
+                      }}
+                    >
+                      {interval.start} - {interval.end}
+                    </Button>
+                  ))
+                )}
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
-                3
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Start</p>
+                <Select value={startTime} onValueChange={setStartTime}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.map((time) => (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <p className="font-medium">Zarezerwuj salę</p>
-                <p className="text-muted-foreground">
-                  Kliknij na salę na planie lub przycisk "Zarezerwuj"
-                </p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Koniec</p>
+                <Select value={endTime} onValueChange={setEndTime}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.map((time) => (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Zamknij
+            </Button>
+            <Button
+              disabled={
+                !reservationDraft ||
+                hasInvalidRange ||
+                draftOverCapacity ||
+                draftConflict
+              }
+              onClick={() => reservationDraft && reserveRoom(reservationDraft.roomId, startTime, endTime)}
+            >
+              Zarezerwuj sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

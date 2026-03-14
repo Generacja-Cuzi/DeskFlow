@@ -219,6 +219,10 @@ export function InteractiveFloorPlan({
   mode = "reservation", 
   showReservationStatus = true, 
   enableReservation = true,
+  clickableTypes = ["desk", "room"],
+  availabilityByTarget,
+  selectedRange,
+  onElementClick,
   className = "",
 }: Partial<InteractiveFloorPlanProps>) {
   const { currentFloor, setCurrentFloor, floorPlans, reserveDesk, reserveRoom, viewState, updateFilters, selectElement } = useReservation()
@@ -245,9 +249,28 @@ export function InteractiveFloorPlan({
   )
 
   // Handle element click
+  const toMinutes = useCallback((value: string) => {
+    const [hour, minute] = value.split(":").map(Number)
+    return hour * 60 + minute
+  }, [])
+
+  const isOverlapping = useCallback((startA: string, endA: string, startB: string, endB: string) => {
+    const aStart = toMinutes(startA)
+    const aEnd = toMinutes(endA)
+    const bStart = toMinutes(startB)
+    const bEnd = toMinutes(endB)
+    return aStart < bEnd && bStart < aEnd
+  }, [toMinutes])
+
+  const toHour = useCallback((value: string) => {
+    return new Date(value).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })
+  }, [])
+
   const handleElementClick = useCallback((element: FloorElement) => {
     setSelectedElement(element)
     selectElement(element.id)
+
+    onElementClick?.(element)
     
     if (enableReservation && (element.type === "desk" || element.type === "room")) {
       if (element.status === "available" || 
@@ -255,7 +278,7 @@ export function InteractiveFloorPlan({
         setReservationDialogOpen(true)
       }
     }
-  }, [enableReservation, selectElement])
+  }, [enableReservation, onElementClick, selectElement])
 
   // Handle reservation
   const handleReservation = async (request: DeskReservationRequest | RoomReservationRequest) => {
@@ -297,6 +320,27 @@ export function InteractiveFloorPlan({
   const getElementColor = (element: FloorElement) => {
     if (element.type === "wall") return "#6b7280"
     if (element.type === "door") return "#f59e0b"
+
+    if (
+      selectedRange &&
+      availabilityByTarget &&
+      (element.type === "desk" || element.type === "room")
+    ) {
+      const busySlots = availabilityByTarget[element.id]
+      if (!busySlots) {
+        return element.type === "desk" ? branding.primaryColor : branding.secondaryColor
+      }
+
+      const isBusyForRange = busySlots.some((slot) =>
+        isOverlapping(selectedRange.startTime, selectedRange.endTime, toHour(slot.startAt), toHour(slot.endAt))
+      )
+
+      if (isBusyForRange) {
+        return branding.primaryColor
+      }
+
+      return branding.secondaryColor
+    }
     
     switch (element.status) {
       case "available":
@@ -348,7 +392,9 @@ export function InteractiveFloorPlan({
   const renderElement = (element: FloorElement) => {
     const isSelected = element.id === viewState.selectedElementId
     const color = getElementColor(element)
-    const isClickable = element.type === "desk" || element.type === "room"
+    const isClickable =
+      (element.type === "desk" || element.type === "room") &&
+      clickableTypes.includes(element.type)
 
     return (
       <Group

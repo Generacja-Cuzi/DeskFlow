@@ -8,6 +8,7 @@ interface AuthLandingProps {
   subtitle: string
   showAuthActions?: boolean
   showSignOutAction?: boolean
+  statusMessage?: string
 }
 
 export function AuthLanding({
@@ -15,6 +16,7 @@ export function AuthLanding({
   subtitle,
   showAuthActions = true,
   showSignOutAction = false,
+  statusMessage = "Brak przypisanej organizacji. Skontaktuj sie z administratorem firmy.",
 }: AuthLandingProps) {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-6 py-16 text-slate-100">
@@ -46,7 +48,7 @@ export function AuthLanding({
         ) : (
           <div className="mt-8 space-y-3">
             <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-3 text-sm text-amber-100">
-              Brak przypisanej organizacji. Skontaktuj sie z administratorem firmy.
+              {statusMessage}
             </div>
             {showSignOutAction && (
               <SignOutButton>

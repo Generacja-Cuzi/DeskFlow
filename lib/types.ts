@@ -184,7 +184,10 @@ export interface InteractiveFloorPlanProps {
   onElementSelect?: (element: FloorElement) => void
   showReservationStatus?: boolean
   enableReservation?: boolean
+  clickableTypes?: Array<"desk" | "room">
   filters?: ReservationFilters
+  availabilityByTarget?: Record<string, Array<{ startAt: string; endAt: string }>>
+  selectedRange?: { startTime: string; endTime: string }
   className?: string
 }
 

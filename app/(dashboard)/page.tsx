@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,44 +16,15 @@ import {
 import Link from "next/link"
 import { useBranding } from "@/lib/contexts/branding-context"
 
-const stats = [
-  {
-    name: "Dostepne biurka",
-    value: "24",
-    total: "40",
-    icon: Monitor,
-    href: "/biurka",
-    color: "text-primary",
-    bgColor: "bg-primary/10",
-  },
-  {
-    name: "Wolne sale",
-    value: "3",
-    total: "8",
-    icon: Users,
-    href: "/sale",
-    color: "text-accent",
-    bgColor: "bg-accent/10",
-  },
-  {
-    name: "Sprzet do wypozyczenia",
-    value: "15",
-    total: "32",
-    icon: Package,
-    href: "/sprzet",
-    color: "text-chart-3",
-    bgColor: "bg-chart-3/10",
-  },
-  {
-    name: "Twoje rezerwacje",
-    value: "5",
-    total: "",
-    icon: Calendar,
-    href: "/rezerwacje",
-    color: "text-chart-5",
-    bgColor: "bg-chart-5/10",
-  },
-]
+const defaultStats: Array<{
+  name: string
+  value: string
+  total: string
+  icon: any
+  href: string
+  color: string
+  bgColor: string
+}> = []
 
 const upcomingReservations = [
   {
@@ -90,6 +62,59 @@ const recentActivity = [
 
 export default function DashboardPage() {
   const { branding } = useBranding()
+  const [stats, setStats] = useState(defaultStats)
+
+  useEffect(() => {
+    const loadStats = async () => {
+      const response = await fetch('/api/dashboard/overview', { cache: 'no-store' })
+      if (!response.ok) return
+
+      const data = await response.json()
+      const next = data?.stats
+      if (!next) return
+
+      setStats([
+        {
+          name: "Aktywne rezerwacje",
+          value: String(next.activeReservations ?? 0),
+          total: "",
+          icon: Calendar,
+          href: "/rezerwacje",
+          color: "text-chart-5",
+          bgColor: "bg-chart-5/10",
+        },
+        {
+          name: "Uzytkownicy",
+          value: String(next.users ?? 0),
+          total: "",
+          icon: Users,
+          href: "/admin",
+          color: "text-accent",
+          bgColor: "bg-accent/10",
+        },
+        {
+          name: "Dostepne biurka",
+          value: String(next.availableDesks ?? 0),
+          total: String(next.totalDesks ?? 0),
+          icon: Monitor,
+          href: "/biurka",
+          color: "text-primary",
+          bgColor: "bg-primary/10",
+        },
+        {
+          name: "Wypozyczony sprzet",
+          value: String(next.borrowedEquipment ?? 0),
+          total: "",
+          icon: Package,
+          href: "/sprzet",
+          color: "text-chart-3",
+          bgColor: "bg-chart-3/10",
+        },
+      ])
+    }
+
+    loadStats()
+  }, [])
 
   return (
     <div className="p-8">

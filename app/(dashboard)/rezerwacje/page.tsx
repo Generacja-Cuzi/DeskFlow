@@ -28,7 +28,7 @@ interface Reservation {
   date: Date
   startTime: string
   endTime: string
-  status: "active" | "upcoming" | "completed" | "cancelled"
+  status: "pending" | "approved" | "issued" | "active" | "upcoming" | "completed" | "cancelled" | "rejected"
 }
 
 const getTypeIcon = (type: string) => {
@@ -59,6 +59,12 @@ const getTypeName = (type: string) => {
 
 const getStatusBadge = (status: string) => {
   switch (status) {
+    case "pending":
+      return <Badge variant="outline">Oczekuje na akceptacje</Badge>
+    case "approved":
+      return <Badge className="bg-primary text-primary-foreground">Zaakceptowana</Badge>
+    case "issued":
+      return <Badge className="bg-accent text-accent-foreground">Wydane</Badge>
     case "active":
       return <Badge className="bg-accent text-accent-foreground">Aktywna</Badge>
     case "upcoming":
@@ -67,6 +73,8 @@ const getStatusBadge = (status: string) => {
       return <Badge variant="secondary">Zakonczona</Badge>
     case "cancelled":
       return <Badge variant="destructive">Anulowana</Badge>
+    case "rejected":
+      return <Badge variant="destructive">Odrzucona</Badge>
     default:
       return null
   }
@@ -105,8 +113,16 @@ export default function RezerwacjePage() {
     loadReservations()
   }, [])
 
-  const activeReservations = reservations.filter(r => r.status === "active" || r.status === "upcoming")
-  const pastReservations = reservations.filter(r => r.status === "completed" || r.status === "cancelled")
+  const activeReservations = reservations.filter(r => ["pending", "approved", "issued", "active", "upcoming"].includes(r.status))
+  const pastReservations = reservations.filter(r => ["completed", "cancelled", "rejected"].includes(r.status))
+  const canCancelReservation = (reservation: Reservation) => {
+    if (reservation.type === "equipment" && reservation.status === "issued") {
+      return false
+    }
+
+    return ["pending", "approved", "active", "upcoming"].includes(reservation.status)
+  }
+
 
   const handleCancelClick = (reservation: Reservation) => {
     setSelectedReservation(reservation)
@@ -230,6 +246,7 @@ export default function RezerwacjePage() {
                             variant="outline"
                             className="text-destructive hover:bg-destructive/10"
                             onClick={() => handleCancelClick(reservation)}
+                            disabled={!canCancelReservation(reservation)}
                           >
                             <X className="h-4 w-4 mr-1" />
                             Anuluj

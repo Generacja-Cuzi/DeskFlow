@@ -48,40 +48,97 @@ export function AppSidebar() {
   const { signOut } = useClerk()
   const { user } = useUser()
   const { logo, fallback, primaryColor, companyName } = useCompanyLogo()
+  const [resolvedRole, setResolvedRole] = useState<"superadmin" | "admin" | "user">("user")
   const [impersonatedCompanyName, setImpersonatedCompanyName] = useState<string | null>(null)
+  const [membershipCount, setMembershipCount] = useState(0)
 
   useEffect(() => {
-    const saved = localStorage.getItem("superadminImpersonation")
-    if (!saved) {
-      setImpersonatedCompanyName(null)
-      return
+    const loadAuthState = async () => {
+      const response = await fetch('/api/auth/me', { cache: 'no-store' })
+      if (!response.ok) return
+
+      const data = await response.json()
+      const role = (data?.user?.role as "superadmin" | "admin" | "user" | undefined) || "user"
+      setResolvedRole(role)
+      setMembershipCount(Array.isArray(data?.memberships) ? data.memberships.length : 0)
+
+      if (data?.impersonation?.active) {
+        setImpersonatedCompanyName(data?.impersonation?.companyName || "Wybrana firma")
+        return
+      }
+
+      if (role !== "superadmin") {
+        localStorage.removeItem("superadminImpersonation")
+        localStorage.removeItem("companyBranding")
+        setImpersonatedCompanyName(null)
+        return
+      }
+
+      const saved = localStorage.getItem("superadminImpersonation")
+      if (!saved) {
+        setImpersonatedCompanyName(null)
+        return
+      }
+
+      try {
+        const parsed = JSON.parse(saved) as { companyName?: string }
+        setImpersonatedCompanyName(parsed.companyName || null)
+      } catch {
+        setImpersonatedCompanyName(null)
+      }
     }
 
-    try {
-      const parsed = JSON.parse(saved) as { companyName?: string }
-      setImpersonatedCompanyName(parsed.companyName || null)
-    } catch {
-      setImpersonatedCompanyName(null)
-    }
+    loadAuthState()
   }, [])
 
   const currentUser = {
     name: user?.fullName || user?.firstName || "Uzytkownik",
     email: user?.primaryEmailAddress?.emailAddress || "",
-    role: ((user?.publicMetadata?.role as string) || "user") as "superadmin" | "admin" | "user",
+    role: resolvedRole,
     imageUrl: user?.imageUrl,
   }
 
   const isImpersonating = !!impersonatedCompanyName
   const isSuperAdmin = currentUser.role === "superadmin" && !isImpersonating
+  const canAccessAdmin = currentUser.role === "admin" || isImpersonating
+  const canSwitchCompany = membershipCount > 1 && !isImpersonating && currentUser.role !== "superadmin"
 
   const handleExitImpersonation = async () => {
     await fetch('/api/superadmin/impersonation', {
       method: 'DELETE',
     })
 
+    await fetch('/api/auth/active-company', {
+      method: 'DELETE',
+    })
+
     localStorage.removeItem("superadminImpersonation")
+    localStorage.removeItem("companyBranding")
     router.push("/superadmin/firmy")
+    router.refresh()
+  }
+
+  const handleSignOut = async () => {
+    await fetch('/api/superadmin/impersonation', {
+      method: 'DELETE',
+    })
+
+    await fetch('/api/auth/active-company', {
+      method: 'DELETE',
+    })
+
+    localStorage.removeItem("superadminImpersonation")
+    localStorage.removeItem("companyBranding")
+    await signOut()
+  }
+
+  const handleSwitchCompany = async () => {
+    await fetch('/api/auth/active-company', {
+      method: 'DELETE',
+    })
+
+    router.push('/')
+    router.refresh()
   }
 
   return (
@@ -121,6 +178,21 @@ export function AppSidebar() {
           </div>
         )}
 
+        {canSwitchCompany && (
+          <div className="mx-2 mb-3 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-3">
+            <p className="text-xs uppercase tracking-wide text-sidebar-foreground/60">Wiele firm</p>
+            <p className="text-sm font-medium text-sidebar-foreground">Masz dostep do {membershipCount} firm</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-2 w-full"
+              onClick={handleSwitchCompany}
+            >
+              Zmien firme
+            </Button>
+          </div>
+        )}
+
         {navigation.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -146,27 +218,31 @@ export function AppSidebar() {
         })}
 
         <div className="pt-4 mt-4 border-t border-sidebar-border">
-          <p className="px-3 py-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
-            Administracja
-          </p>
-          {adminNavigation.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                )}
-              >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-              </Link>
-            )
-          })}
+          {canAccessAdmin && (
+            <>
+              <p className="px-3 py-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
+                Administracja
+              </p>
+              {adminNavigation.map((item) => {
+                const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {item.name}
+                  </Link>
+                )
+              })}
+            </>
+          )}
 
           {isSuperAdmin && (
             <>
@@ -218,7 +294,7 @@ export function AppSidebar() {
             variant="ghost"
             size="icon"
             className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
-            onClick={() => signOut()}
+            onClick={handleSignOut}
           >
             <LogOut className="h-4 w-4" />
           </Button>

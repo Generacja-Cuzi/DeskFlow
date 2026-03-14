@@ -2,32 +2,53 @@ import { and, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { reservations, resources, users } from '@/lib/db/schema'
-import { getActor } from '@/lib/server/auth'
+import { reservations, resources, userCompanyMemberships, users } from '@/lib/db/schema'
+import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
 function formatShortDate(date: Date) {
   return date.toISOString().slice(0, 10)
 }
 
+function toPolishType(type: string) {
+  if (type === 'equipment') return 'Sprzet'
+  if (type === 'desk') return 'Biurko'
+  if (type === 'room') return 'Sala'
+  return type
+}
+
 export async function GET() {
-  const actor = await getActor()
-
-  if (!actor.user || (actor.user.role !== 'admin' && actor.user.role !== 'superadmin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   const companyId = await getActiveCompanyId()
 
   if (!companyId) {
     return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
   }
 
-  const [usersRows, resourcesRows, reservationRows] = await Promise.all([
-    db.query.users.findMany({ where: eq(users.companyId, companyId) }),
+  const canManage = await canManageCompany(companyId)
+
+  if (!canManage) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const [membershipsRows, resourcesRows, reservationRows] = await Promise.all([
+    db.query.userCompanyMemberships.findMany({
+      where: eq(userCompanyMemberships.companyId, companyId),
+      with: {
+        user: true,
+      },
+    }),
     db.query.resources.findMany({ where: eq(resources.companyId, companyId) }),
     db.query.reservations.findMany({ where: eq(reservations.companyId, companyId), with: { user: true } }),
   ])
+
+  const usersRows = membershipsRows.map((membership) => ({
+    id: membership.user?.id || membership.userId,
+    name: membership.user?.name || 'Uzytkownik',
+    email: membership.user?.email || '',
+    department: membership.user?.department || null,
+    role: membership.role,
+    status: membership.status,
+  }))
 
   const activeReservationsCount = reservationRows.filter((r) => r.status === 'active' || r.status === 'upcoming').length
   const availableDesksCount = resourcesRows.filter((r) => r.type === 'Biurko' && r.status === 'available').length
@@ -54,17 +75,63 @@ export async function GET() {
     rezerwacje: reservationRows.length + index * 5,
   }))
 
+  const equipmentWorkflowByResource = new Map<
+    string,
+    {
+      status: string
+      reservationId: string
+      userName: string
+      dueDate: string
+      createdAt: Date
+    }
+  >()
+
+  for (const reservation of reservationRows) {
+    if (reservation.type !== 'equipment' || !reservation.resourceId) {
+      continue
+    }
+
+    if (reservation.status === 'cancelled' || reservation.status === 'completed' || reservation.status === 'rejected') {
+      continue
+    }
+
+    const existing = equipmentWorkflowByResource.get(reservation.resourceId)
+    const userName = reservation.user?.name || 'Uzytkownik'
+    if (!existing || existing.createdAt < reservation.createdAt) {
+      equipmentWorkflowByResource.set(reservation.resourceId, {
+        status: reservation.status,
+        reservationId: reservation.id,
+        userName,
+        dueDate: reservation.endAt.toISOString().slice(0, 10),
+        createdAt: reservation.createdAt,
+      })
+    }
+  }
+
   const pendingRequests = reservationRows
-    .filter((reservation) => reservation.pendingApproval && reservation.status !== 'cancelled')
-    .slice(0, 5)
+    .filter((reservation) => reservation.type === 'equipment' && reservation.status === 'pending')
+    .slice(0, 10)
     .map((reservation) => ({
       id: reservation.id,
       user: reservation.user?.name || 'Uzytkownik',
-      type: reservation.type === 'equipment' ? 'Sprzet' : reservation.type,
+      type: toPolishType(reservation.type),
       item: reservation.name,
       date: formatShortDate(reservation.createdAt),
-      status: 'pending',
+      status: reservation.status,
+      purpose: reservation.meetingTitle || null,
     }))
+
+  const resourcesWithWorkflow = resourcesRows.map((resource) => {
+    const workflow = equipmentWorkflowByResource.get(resource.id)
+
+    return {
+      ...resource,
+      workflowStatus: workflow?.status || null,
+      workflowReservationId: workflow?.reservationId || null,
+      workflowUser: workflow?.userName || null,
+      workflowDueDate: workflow?.dueDate || null,
+    }
+  })
 
   return NextResponse.json({
     stats,
@@ -72,6 +139,6 @@ export async function GET() {
     monthlyData,
     pendingRequests,
     users: usersRows,
-    resources: resourcesRows,
+    resources: resourcesWithWorkflow,
   })
 }

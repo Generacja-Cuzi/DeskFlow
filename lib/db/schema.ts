@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core'
 
@@ -28,6 +29,24 @@ export const users = pgTable('users', {
   status: varchar('status', { length: 32 }).notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const userCompanyMemberships = pgTable(
+  'user_company_memberships',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    companyId: text('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 32 }).notNull().default('user'),
+    status: varchar('status', { length: 32 }).notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userCompanyUnique: uniqueIndex('user_company_memberships_user_company_unique').on(
+      table.userId,
+      table.companyId
+    ),
+  })
+)
 
 export const companyBranding = pgTable('company_branding', {
   companyId: text('company_id').primaryKey().references(() => companies.id, { onDelete: 'cascade' }),
@@ -118,6 +137,7 @@ export const reservations = pgTable('reservations', {
 
 export const companiesRelations = relations(companies, ({ many, one }) => ({
   users: many(users),
+  memberships: many(userCompanyMemberships),
   floors: many(floors),
   resources: many(resources),
   reservations: many(reservations),
@@ -154,7 +174,19 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.companyId],
     references: [companies.id],
   }),
+  memberships: many(userCompanyMemberships),
   reservations: many(reservations),
+}))
+
+export const userCompanyMembershipsRelations = relations(userCompanyMemberships, ({ one }) => ({
+  user: one(users, {
+    fields: [userCompanyMemberships.userId],
+    references: [users.id],
+  }),
+  company: one(companies, {
+    fields: [userCompanyMemberships.companyId],
+    references: [companies.id],
+  }),
 }))
 
 export const resourcesRelations = relations(resources, ({ one, many }) => ({

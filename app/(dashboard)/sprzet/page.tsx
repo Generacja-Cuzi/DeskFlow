@@ -31,6 +31,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 
 type EquipmentCategory = "laptops" | "monitors" | "projectors" | "vehicles" | "accessories"
 type EquipmentStatus = "available" | "borrowed" | "maintenance"
+type EquipmentWorkflowStatus = "pending" | "approved" | "issued" | "active" | "upcoming" | null
 
 interface Equipment {
   id: string
@@ -41,6 +42,8 @@ interface Equipment {
   description: string
   borrowedBy?: string
   returnDate?: string
+  workflowStatus?: EquipmentWorkflowStatus
+  requestedBy?: string
 }
 
 const categoryInfo: Record<EquipmentCategory, { label: string; icon: React.ElementType }> = {
@@ -60,6 +63,8 @@ export default function SprzetPage() {
   const [showBorrowDialog, setShowBorrowDialog] = useState(false)
   const [borrowStartDate, setBorrowStartDate] = useState<Date>(new Date())
   const [borrowEndDate, setBorrowEndDate] = useState<Date>(new Date())
+  const [purpose, setPurpose] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   const loadEquipment = async () => {
     const response = await fetch('/api/equipment', { cache: 'no-store' })
@@ -89,6 +94,8 @@ export default function SprzetPage() {
   const submitBorrowRequest = async () => {
     if (!selectedEquipment) return
 
+    setSubmitting(true)
+
     const response = await fetch('/api/reservations/equipment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,13 +103,17 @@ export default function SprzetPage() {
         resourceId: selectedEquipment.id,
         startDate: borrowStartDate.toISOString(),
         endDate: borrowEndDate.toISOString(),
+        purpose,
       }),
     })
 
     if (response.ok) {
       setShowBorrowDialog(false)
+      setPurpose("")
       await loadEquipment()
     }
+
+    setSubmitting(false)
   }
 
   const getStatusBadge = (status: EquipmentStatus) => {
@@ -116,6 +127,24 @@ export default function SprzetPage() {
     }
   }
 
+  const getWorkflowBadge = (status: EquipmentWorkflowStatus) => {
+    if (!status) return null
+
+    if (status === "pending") {
+      return <Badge variant="outline">Wniosek oczekuje</Badge>
+    }
+
+    if (status === "approved") {
+      return <Badge className="bg-primary text-primary-foreground">Zaakceptowany - czeka na wydanie</Badge>
+    }
+
+    if (status === "issued" || status === "active" || status === "upcoming") {
+      return <Badge variant="secondary">Wydany</Badge>
+    }
+
+    return null
+  }
+
   const getCategoryIcon = (category: EquipmentCategory) => {
     const Icon = categoryInfo[category].icon
     return <Icon className="h-5 w-5" />
@@ -123,6 +152,7 @@ export default function SprzetPage() {
 
   const availableCount = equipment.filter(e => e.status === "available").length
   const borrowedCount = equipment.filter(e => e.status === "borrowed").length
+  const pendingCount = equipment.filter(e => e.workflowStatus === "pending").length
 
   return (
     <div className="p-8">
@@ -141,6 +171,10 @@ export default function SprzetPage() {
           <div className="flex items-center gap-2 text-sm">
             <div className="h-3 w-3 rounded-full bg-muted-foreground" />
             <span>{borrowedCount} wypozyczonych</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="h-3 w-3 rounded-full bg-primary" />
+            <span>{pendingCount} oczekujacych wnioskow</span>
           </div>
         </div>
       </div>
@@ -231,6 +265,12 @@ export default function SprzetPage() {
               </div>
               <p className="text-sm text-muted-foreground">{item.description}</p>
 
+              {getWorkflowBadge(item.workflowStatus || null)}
+
+              {item.workflowStatus && item.requestedBy && (
+                <p className="text-xs text-muted-foreground">Wniosek: {item.requestedBy}</p>
+              )}
+
               {item.status === "borrowed" && item.borrowedBy && (
                 <div className="rounded-lg bg-muted/50 p-3 text-sm">
                   <div className="flex justify-between">
@@ -245,9 +285,17 @@ export default function SprzetPage() {
               )}
 
               <div className="pt-2">
-                {item.status === "available" ? (
+                {item.status === "available" && !item.workflowStatus ? (
                   <Button className="w-full" onClick={() => handleBorrow(item)}>
-                    Wypozycz
+                    Zloz wniosek o wypozyczenie
+                  </Button>
+                ) : item.workflowStatus === "pending" ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    Wniosek oczekuje na akceptacje
+                  </Button>
+                ) : item.workflowStatus === "approved" ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    Zaakceptowano - czeka na wydanie
                   </Button>
                 ) : item.status === "borrowed" ? (
                   <Button variant="outline" className="w-full" disabled>
@@ -347,6 +395,8 @@ export default function SprzetPage() {
                   placeholder="Opisz krotko, do czego potrzebujesz sprzetu..."
                   className="resize-none"
                   rows={3}
+                  value={purpose}
+                  onChange={(event) => setPurpose(event.target.value)}
                 />
               </Field>
             </FieldGroup>
@@ -364,9 +414,9 @@ export default function SprzetPage() {
               <X className="h-4 w-4 mr-2" />
               Anuluj
             </Button>
-            <Button onClick={submitBorrowRequest}>
+            <Button onClick={submitBorrowRequest} disabled={submitting || !purpose.trim()}>
               <Check className="h-4 w-4 mr-2" />
-              Zloez wniosek
+              {submitting ? "Wysylanie..." : "Zloz wniosek"}
             </Button>
           </DialogFooter>
         </DialogContent>

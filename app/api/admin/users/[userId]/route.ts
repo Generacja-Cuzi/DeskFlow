@@ -6,7 +6,7 @@ import { userCompanyMemberships, users } from '@/lib/db/schema'
 import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
-export async function PATCH(request: Request, context: { params: Promise<{ userId: string }> }) {
+export async function DELETE(_: Request, context: { params: Promise<{ userId: string }> }) {
   const actor = await getActor()
 
   if (!actor.user) {
@@ -26,25 +26,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
   }
 
   const { userId } = await context.params
-  const body = await request.json()
-  const nextRole = body.role === 'admin' || body.role === 'user' ? body.role : null
 
-  if (!nextRole) {
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
-  }
-
-  const target = await db.query.userCompanyMemberships.findFirst({
-    where: and(eq(userCompanyMemberships.userId, userId), eq(userCompanyMemberships.companyId, companyId)),
-  })
-
-  if (!target) {
-    return NextResponse.json({ error: 'User not found in your company' }, { status: 404 })
+  if (actor.user.id === userId) {
+    return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
   }
 
   await db
-    .update(userCompanyMemberships)
-    .set({ role: nextRole })
+    .delete(userCompanyMemberships)
     .where(and(eq(userCompanyMemberships.userId, userId), eq(userCompanyMemberships.companyId, companyId)))
+
+  const remainingMembership = await db.query.userCompanyMemberships.findFirst({ where: eq(userCompanyMemberships.userId, userId) })
+
+  if (!remainingMembership) {
+    await db.delete(users).where(eq(users.id, userId))
+  }
 
   return NextResponse.json({ ok: true })
 }

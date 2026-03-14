@@ -3,11 +3,13 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { floorElements, reservations, resources } from '@/lib/db/schema'
+import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
 export async function PATCH(_: Request, context: { params: Promise<{ reservationId: string }> }) {
   const { reservationId } = await context.params
   const companyId = await getActiveCompanyId()
+  const actor = await getActor()
 
   if (!companyId) {
     return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
@@ -19,6 +21,21 @@ export async function PATCH(_: Request, context: { params: Promise<{ reservation
 
   if (!reservation) {
     return NextResponse.json({ error: 'Reservation not found' }, { status: 404 })
+  }
+
+  const manager = await canManageCompany(companyId)
+  const ownsReservation = Boolean(actor.user?.id && reservation.userId === actor.user.id)
+
+  if (!manager && !ownsReservation) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  if (reservation.status === 'completed' || reservation.status === 'rejected') {
+    return NextResponse.json({ error: 'Reservation can no longer be cancelled' }, { status: 409 })
+  }
+
+  if (reservation.type === 'equipment' && reservation.status === 'issued') {
+    return NextResponse.json({ error: 'Issued equipment must be returned by admin' }, { status: 409 })
   }
 
   await db
