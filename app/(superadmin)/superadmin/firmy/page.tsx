@@ -76,6 +76,13 @@ export default function CompaniesPage() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isAddAdminDialogOpen, setIsAddAdminDialogOpen] = useState(false)
+  const [targetCompanyForAdmin, setTargetCompanyForAdmin] = useState<Company | null>(null)
+  const [newAdmin, setNewAdmin] = useState({
+    name: "",
+    email: "",
+    department: "Management",
+  })
   const [newCompany, setNewCompany] = useState({
     name: "",
     slug: "",
@@ -144,7 +151,36 @@ export default function CompaniesPage() {
     await loadCompanies()
   }
 
-  const enterCompanyAsAdmin = (company: Company) => {
+  const openAddAdminDialog = (company: Company) => {
+    setTargetCompanyForAdmin(company)
+    setNewAdmin({
+      name: "",
+      email: "",
+      department: "Management",
+    })
+    setIsAddAdminDialogOpen(true)
+  }
+
+  const handleCreateAdmin = async () => {
+    if (!targetCompanyForAdmin) return
+
+    const response = await fetch('/api/superadmin/company-admins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId: targetCompanyForAdmin.id,
+        ...newAdmin,
+      }),
+    })
+
+    if (!response.ok) return
+
+    await loadCompanies()
+    setIsAddAdminDialogOpen(false)
+    setTargetCompanyForAdmin(null)
+  }
+
+  const enterCompanyAsAdmin = async (company: Company) => {
     const brandingPayload = {
       id: company.id,
       name: company.name,
@@ -160,6 +196,14 @@ export default function CompaniesPage() {
       companySlug: company.slug,
       enteredAt: new Date().toISOString(),
     }
+
+    const response = await fetch('/api/superadmin/impersonation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId: company.id }),
+    })
+
+    if (!response.ok) return
 
     localStorage.setItem("companyBranding", JSON.stringify(brandingPayload))
     localStorage.setItem("superadminImpersonation", JSON.stringify(impersonationPayload))
@@ -360,6 +404,10 @@ export default function CompaniesPage() {
                           <ExternalLink className="h-4 w-4 mr-2" />
                           Wejdz jako admin
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openAddAdminDialog(company)}>
+                          <Users className="h-4 w-4 mr-2" />
+                          Dodaj admina firmy
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
@@ -479,6 +527,52 @@ export default function CompaniesPage() {
               Anuluj
             </Button>
             <Button onClick={handleUpdateCompany}>Zapisz zmiany</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddAdminDialogOpen} onOpenChange={setIsAddAdminDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Dodaj admina firmy</DialogTitle>
+            <DialogDescription>
+              {targetCompanyForAdmin
+                ? `Nowy administrator zostanie przypisany do firmy ${targetCompanyForAdmin.name}.`
+                : "Uzupelnij dane nowego administratora."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Imie i nazwisko</Label>
+              <Input
+                value={newAdmin.name}
+                onChange={(event) => setNewAdmin({ ...newAdmin, name: event.target.value })}
+                placeholder="np. Anna Nowak"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={newAdmin.email}
+                onChange={(event) => setNewAdmin({ ...newAdmin, email: event.target.value })}
+                placeholder="anna.nowak@firma.pl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Dzial</Label>
+              <Input
+                value={newAdmin.department}
+                onChange={(event) => setNewAdmin({ ...newAdmin, department: event.target.value })}
+                placeholder="Management"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setIsAddAdminDialogOpen(false)}>
+                Anuluj
+              </Button>
+              <Button onClick={handleCreateAdmin}>Dodaj admina</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -8,6 +8,10 @@ import { getActiveCompanyId } from '@/lib/server/company'
 export async function GET() {
   const companyId = await getActiveCompanyId()
 
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const [company, branding] = await Promise.all([
     db.query.companies.findFirst({ where: eq(companies.id, companyId) }),
     db.query.companyBranding.findFirst({ where: eq(companyBranding.companyId, companyId) }),
@@ -21,6 +25,11 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const companyId = await getActiveCompanyId()
+
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const body = await request.json()
 
   const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'DeskFlow'

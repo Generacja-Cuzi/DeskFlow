@@ -11,6 +11,10 @@ export async function POST(request: Request) {
   const companyId = await getActiveCompanyId()
   const actor = await getActor()
 
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const resource = await db.query.resources.findFirst({
     where: and(eq(resources.id, body.resourceId), eq(resources.companyId, companyId)),
   })

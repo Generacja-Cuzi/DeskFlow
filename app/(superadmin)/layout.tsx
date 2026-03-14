@@ -1,6 +1,8 @@
 import { SuperAdminSidebar } from "@/components/super-admin-sidebar"
 import { auth } from "@clerk/nextjs/server"
 import { AuthLanding } from "@/components/auth-landing"
+import { getActor } from "@/lib/server/auth"
+import { redirect } from "next/navigation"
 
 export default async function SuperAdminLayout({
   children,
@@ -16,6 +18,12 @@ export default async function SuperAdminLayout({
         subtitle="Zaloguj sie albo zarejestruj, aby zarzadzac firmami, konfiguracja i dostepem do calej platformy."
       />
     )
+  }
+
+  const actor = await getActor()
+
+  if (!actor.user || actor.user.role !== "superadmin") {
+    redirect("/")
   }
 
   return (

@@ -3,8 +3,15 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { companies, reservations, users } from '@/lib/db/schema'
+import { getActor } from '@/lib/server/auth'
 
 export async function GET() {
+  const actor = await getActor()
+
+  if (!actor.user || actor.user.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const [allCompanies, allUsers, allReservations] = await Promise.all([
     db.select({ value: count() }).from(companies),
     db.select({ value: count() }).from(users),

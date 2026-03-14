@@ -3,8 +3,15 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { companies, companyBranding, users } from '@/lib/db/schema'
+import { getActor } from '@/lib/server/auth'
 
 export async function GET() {
+  const actor = await getActor()
+
+  if (!actor.user || actor.user.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const rows = await db.query.companies.findMany({
     with: {
       users: true,
@@ -28,6 +35,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const actor = await getActor()
+
+  if (!actor.user || actor.user.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const body = await request.json()
   const id = crypto.randomUUID()
 

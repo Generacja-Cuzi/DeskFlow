@@ -9,6 +9,10 @@ export async function PATCH(_: Request, context: { params: Promise<{ reservation
   const { reservationId } = await context.params
   const companyId = await getActiveCompanyId()
 
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const reservation = await db.query.reservations.findFirst({
     where: and(eq(reservations.id, reservationId), eq(reservations.companyId, companyId)),
   })

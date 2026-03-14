@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react"
 import Link from "next/link"
+import { useBranding } from "@/lib/contexts/branding-context"
 
 const stats = [
   {
@@ -88,12 +89,14 @@ const recentActivity = [
 ]
 
 export default function DashboardPage() {
+  const { branding } = useBranding()
+
   return (
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Witaj, Jan!</h1>
         <p className="text-muted-foreground mt-1">
-          Oto podsumowanie dostepnosci zasobow w Twojej firmie.
+          Oto podsumowanie dostepnosci zasobow w firmie {branding.name}.
         </p>
       </div>
 

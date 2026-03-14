@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useClerk, useUser } from "@clerk/nextjs"
 import {
   LayoutDashboard,
   Building2,
@@ -27,6 +28,13 @@ const navigation = [
 
 export function SuperAdminSidebar() {
   const pathname = usePathname()
+  const { signOut } = useClerk()
+  const { user } = useUser()
+
+  const currentUser = {
+    name: user?.fullName || user?.firstName || "Super Admin",
+    email: user?.primaryEmailAddress?.emailAddress || "admin@deskflow.io",
+  }
 
   return (
     <aside className="flex h-screen w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-white border-r border-slate-700">
@@ -71,10 +79,15 @@ export function SuperAdminSidebar() {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">Super Admin</p>
-            <p className="text-xs text-slate-400 truncate">admin@deskflow.io</p>
+            <p className="text-sm font-medium truncate">{currentUser.name}</p>
+            <p className="text-xs text-slate-400 truncate">{currentUser.email}</p>
           </div>
-          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-white/10">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-slate-400 hover:text-white hover:bg-white/10"
+            onClick={() => signOut()}
+          >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>

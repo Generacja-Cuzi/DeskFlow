@@ -9,6 +9,10 @@ export async function POST(request: Request) {
   const body = await request.json()
   const companyId = await getActiveCompanyId()
 
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const reservation = await db.query.reservations.findFirst({
     where: and(eq(reservations.companyId, companyId), eq(reservations.targetId, body.targetId), eq(reservations.type, body.type)),
     orderBy: [desc(reservations.startAt)],

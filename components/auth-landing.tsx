@@ -1,14 +1,21 @@
 "use client"
 
-import { SignInButton, SignUpButton } from "@clerk/nextjs"
+import { SignInButton, SignOutButton, SignUpButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 
 interface AuthLandingProps {
   title: string
   subtitle: string
+  showAuthActions?: boolean
+  showSignOutAction?: boolean
 }
 
-export function AuthLanding({ title, subtitle }: AuthLandingProps) {
+export function AuthLanding({
+  title,
+  subtitle,
+  showAuthActions = true,
+  showSignOutAction = false,
+}: AuthLandingProps) {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-6 py-16 text-slate-100">
       <div className="pointer-events-none absolute inset-0">
@@ -25,16 +32,31 @@ export function AuthLanding({ title, subtitle }: AuthLandingProps) {
         <h1 className="mt-6 text-3xl font-bold leading-tight md:text-5xl">{title}</h1>
         <p className="mt-4 max-w-2xl text-sm text-slate-300 md:text-base">{subtitle}</p>
 
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <SignInButton>
-            <Button className="h-11 bg-cyan-500 px-6 text-slate-950 hover:bg-cyan-400">Zaloguj sie</Button>
-          </SignInButton>
-          <SignUpButton>
-            <Button variant="outline" className="h-11 border-slate-300 bg-white px-6 text-black hover:bg-slate-100 hover:text-black">
-              Zarejestruj sie
-            </Button>
-          </SignUpButton>
-        </div>
+        {showAuthActions ? (
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <SignInButton>
+              <Button className="h-11 bg-cyan-500 px-6 text-slate-950 hover:bg-cyan-400">Zaloguj sie</Button>
+            </SignInButton>
+            <SignUpButton>
+              <Button variant="outline" className="h-11 border-slate-300 bg-white px-6 text-black hover:bg-slate-100 hover:text-black">
+                Zarejestruj sie
+              </Button>
+            </SignUpButton>
+          </div>
+        ) : (
+          <div className="mt-8 space-y-3">
+            <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+              Brak przypisanej organizacji. Skontaktuj sie z administratorem firmy.
+            </div>
+            {showSignOutAction && (
+              <SignOutButton>
+                <Button variant="outline" className="h-11 border-slate-300 bg-white px-6 text-black hover:bg-slate-100 hover:text-black">
+                  Wyloguj sie
+                </Button>
+              </SignOutButton>
+            )}
+          </div>
+        )}
 
         <div className="mt-10 grid gap-3 text-xs text-slate-400 md:grid-cols-3">
           <div className="rounded-lg border border-slate-700/70 bg-slate-900/70 p-3">Rezerwacje biurek i sal</div>

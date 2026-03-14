@@ -10,6 +10,10 @@ const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'a
 export async function GET() {
   const companyId = await getActiveCompanyId()
 
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const [items, activeBorrows] = await Promise.all([
     db.query.resources.findMany({
       where: and(eq(resources.companyId, companyId), inArray(resources.category, equipmentCategories)),

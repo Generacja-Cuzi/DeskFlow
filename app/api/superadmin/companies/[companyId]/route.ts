@@ -3,8 +3,15 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { companies, companyBranding } from '@/lib/db/schema'
+import { getActor } from '@/lib/server/auth'
 
 export async function PATCH(request: Request, context: { params: Promise<{ companyId: string }> }) {
+  const actor = await getActor()
+
+  if (!actor.user || actor.user.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const { companyId } = await context.params
   const body = await request.json()
 
@@ -43,6 +50,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ compa
 }
 
 export async function DELETE(_: Request, context: { params: Promise<{ companyId: string }> }) {
+  const actor = await getActor()
+
+  if (!actor.user || actor.user.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const { companyId } = await context.params
   await db.delete(companies).where(eq(companies.id, companyId))
   return NextResponse.json({ ok: true })

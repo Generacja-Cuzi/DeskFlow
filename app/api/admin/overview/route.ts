@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { reservations, resources, users } from '@/lib/db/schema'
+import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
 function formatShortDate(date: Date) {
@@ -10,7 +11,17 @@ function formatShortDate(date: Date) {
 }
 
 export async function GET() {
+  const actor = await getActor()
+
+  if (!actor.user || (actor.user.role !== 'admin' && actor.user.role !== 'superadmin')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const companyId = await getActiveCompanyId()
+
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
 
   const [usersRows, resourcesRows, reservationRows] = await Promise.all([
     db.query.users.findMany({ where: eq(users.companyId, companyId) }),

@@ -100,22 +100,69 @@ export default function AdminPage() {
   const [usersState, setUsersState] = useState(users)
   const [resourcesState, setResourcesState] = useState(resources)
   const [showAddResourceDialog, setShowAddResourceDialog] = useState(false)
+  const [showAddUserDialog, setShowAddUserDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [newUser, setNewUser] = useState({
+    name: "",
+    email: "",
+    department: "",
+  })
+
+  const loadOverview = async () => {
+    const response = await fetch('/api/admin/overview', { cache: 'no-store' })
+    if (!response.ok) return
+    const data = await response.json()
+    setStatsData(data.stats || stats)
+    setUsageDataState(data.usageData || usageData)
+    setMonthlyDataState(data.monthlyData || monthlyData)
+    setPendingRequestsState(data.pendingRequests || pendingRequests)
+    setUsersState(data.users || users)
+    setResourcesState(data.resources || resources)
+  }
 
   useEffect(() => {
-    const load = async () => {
-      const response = await fetch('/api/admin/overview', { cache: 'no-store' })
-      if (!response.ok) return
-      const data = await response.json()
-      setStatsData(data.stats || stats)
-      setUsageDataState(data.usageData || usageData)
-      setMonthlyDataState(data.monthlyData || monthlyData)
-      setPendingRequestsState(data.pendingRequests || pendingRequests)
-      setUsersState(data.users || users)
-      setResourcesState(data.resources || resources)
-    }
-    load()
+    loadOverview()
   }, [])
+
+  const handleAddUser = async () => {
+    const response = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newUser),
+    })
+
+    if (!response.ok) return
+
+    setShowAddUserDialog(false)
+    setNewUser({
+      name: "",
+      email: "",
+      department: "",
+    })
+    await loadOverview()
+  }
+
+  const handlePromoteToAdmin = async (userId: string) => {
+    const response = await fetch(`/api/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'admin' }),
+    })
+
+    if (!response.ok) return
+    await loadOverview()
+  }
+
+  const handleDemoteToUser = async (userId: string) => {
+    const response = await fetch(`/api/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'user' }),
+    })
+
+    if (!response.ok) return
+    await loadOverview()
+  }
 
   const handleApprove = (id: number) => {
     console.log("[v0] Approved request:", id)
@@ -388,7 +435,7 @@ export default function AdminPage() {
                   <CardTitle>Zarzadzanie uzytkownikami</CardTitle>
                   <CardDescription>Lista uzytkownikow systemu</CardDescription>
                 </div>
-                <Button>
+                <Button onClick={() => setShowAddUserDialog(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Dodaj uzytkownika
                 </Button>
@@ -433,6 +480,18 @@ export default function AdminPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {user.role !== "admin" && (
+                              <DropdownMenuItem onClick={() => handlePromoteToAdmin(String(user.id))}>
+                                <Users className="h-4 w-4 mr-2" />
+                                Nadaj role administratora
+                              </DropdownMenuItem>
+                            )}
+                            {user.role === "admin" && (
+                              <DropdownMenuItem onClick={() => handleDemoteToUser(String(user.id))}>
+                                <Users className="h-4 w-4 mr-2" />
+                                Odbierz role administratora
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem>
                               <Edit className="h-4 w-4 mr-2" />
                               Edytuj
@@ -511,6 +570,58 @@ export default function AdminPage() {
             <Button onClick={() => setShowAddResourceDialog(false)}>
               Dodaj zasob
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dodaj uzytkownika</DialogTitle>
+            <DialogDescription>
+              Uzytkownik pojawi sie w tej firmie po pierwszym logowaniu.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Imie i nazwisko</FieldLabel>
+                <Input
+                  placeholder="np. Jan Kowalski"
+                  value={newUser.name}
+                  onChange={(event) => setNewUser({ ...newUser, name: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Email</FieldLabel>
+                <Input
+                  type="email"
+                  placeholder="jan.kowalski@firma.pl"
+                  value={newUser.email}
+                  onChange={(event) => setNewUser({ ...newUser, email: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Dzial</FieldLabel>
+                <Input
+                  placeholder="np. IT"
+                  value={newUser.department}
+                  onChange={(event) => setNewUser({ ...newUser, department: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddUserDialog(false)}>
+              Anuluj
+            </Button>
+            <Button onClick={handleAddUser}>Dodaj uzytkownika</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

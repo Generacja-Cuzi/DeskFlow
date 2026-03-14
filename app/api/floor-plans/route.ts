@@ -8,12 +8,22 @@ import { getFloorPlans } from '@/lib/server/floor-plans'
 
 export async function GET() {
   const companyId = await getActiveCompanyId()
+
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const floorPlans = await getFloorPlans(companyId)
   return NextResponse.json(floorPlans)
 }
 
 export async function POST(request: Request) {
   const companyId = await getActiveCompanyId()
+
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const floorPlan = await request.json()
 
   await db.transaction(async (tx) => {

@@ -68,14 +68,18 @@ export function AppSidebar() {
   const currentUser = {
     name: user?.fullName || user?.firstName || "Uzytkownik",
     email: user?.primaryEmailAddress?.emailAddress || "",
-    role: ((user?.publicMetadata?.role as string) || "superadmin") as "superadmin" | "admin" | "user",
+    role: ((user?.publicMetadata?.role as string) || "user") as "superadmin" | "admin" | "user",
     imageUrl: user?.imageUrl,
   }
 
   const isImpersonating = !!impersonatedCompanyName
   const isSuperAdmin = currentUser.role === "superadmin" && !isImpersonating
 
-  const handleExitImpersonation = () => {
+  const handleExitImpersonation = async () => {
+    await fetch('/api/superadmin/impersonation', {
+      method: 'DELETE',
+    })
+
     localStorage.removeItem("superadminImpersonation")
     router.push("/superadmin/firmy")
   }

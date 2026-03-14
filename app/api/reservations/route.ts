@@ -12,6 +12,10 @@ export async function GET(request: Request) {
   const companyId = await getActiveCompanyId()
   const actor = await getActor()
 
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const rows = mine && actor.user
     ? await db.query.reservations.findMany({
         where: and(eq(reservations.companyId, companyId), eq(reservations.userId, actor.user.id)),

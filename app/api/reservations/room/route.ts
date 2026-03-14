@@ -11,6 +11,10 @@ export async function POST(request: Request) {
   const companyId = await getActiveCompanyId()
   const actor = await getActor()
 
+  if (!companyId) {
+    return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
+  }
+
   const room = await db.query.floorElements.findFirst({ where: eq(floorElements.id, body.roomId) })
 
   if (!room) {
