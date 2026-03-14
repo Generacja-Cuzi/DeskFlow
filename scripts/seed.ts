@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 
-import { db } from '@/lib/db/client'
+import { db } from '../lib/db/client'
 import {
   companies,
   companyBranding,
@@ -9,7 +9,7 @@ import {
   reservations,
   resources,
   users,
-} from '@/lib/db/schema'
+} from '../lib/db/schema'
 
 async function seed() {
   const companyId = 'company-techstart'
@@ -72,7 +72,7 @@ async function seed() {
         id: 'user-jan-kowalski',
         companyId,
         name: 'Jan Kowalski',
-        email: 'jan.kowalski@firma.pl',
+        email: '272715@student.pwr.edu.pl',
         department: 'IT',
         role: 'superadmin',
         status: 'active',

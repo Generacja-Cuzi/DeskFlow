@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react"
-import { FloorPlan, FloorElement, Desk, ConferenceRoom, ReservationContextType, ReservationFilters, FloorPlanViewState, DeskReservationRequest, RoomReservationRequest } from "@/lib/types"
+import { FloorPlan, Desk, ConferenceRoom, ReservationContextType, ReservationFilters, FloorPlanViewState, DeskReservationRequest, RoomReservationRequest } from "@/lib/types"
 
 const ReservationContext = createContext<ReservationContextType | null>(null)
 
@@ -86,7 +86,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       console.error("Error reserving desk:", error)
       return false
     }
-  }, [])
+  }, [refreshFloorPlans])
 
   // Reserve a room
   const reserveRoom = useCallback(async (request: RoomReservationRequest): Promise<boolean> => {
@@ -107,7 +107,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       console.error("Error reserving room:", error)
       return false
     }
-  }, [])
+  }, [refreshFloorPlans])
 
   // Cancel a reservation
   const cancelReservation = useCallback(async (id: string, type: "desk" | "room"): Promise<boolean> => {
@@ -128,7 +128,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       console.error("Error cancelling reservation:", error)
       return false
     }
-  }, [])
+  }, [refreshFloorPlans])
 
   // Update filters
   const updateFilters = useCallback((filters: Partial<ReservationFilters>) => {
@@ -213,7 +213,6 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
     selectElement,
     upsertFloorPlan,
     deleteFloorPlan,
-    refreshFloorPlans,
   ])
 
   return (

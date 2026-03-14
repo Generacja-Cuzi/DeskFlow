@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -25,98 +24,68 @@ import {
   Users,
 } from "lucide-react"
 import type { FloorElement } from "@/components/floor-plan-editor"
+import { useReservation } from "@/lib/contexts/reservation-context"
+import type { FloorPlan } from "@/lib/types"
 
 const FloorPlanEditor = dynamic(
   () => import("@/components/floor-plan-editor").then((mod) => mod.FloorPlanEditor),
   { ssr: false, loading: () => <div className="h-[600px] flex items-center justify-center bg-muted rounded-lg">Ladowanie edytora...</div> }
 )
 
-type Floor = {
-  id: string
-  name: string
-  elements: FloorElement[]
-  canvasWidth: number
-  canvasHeight: number
-  desksCount: number
-  roomsCount: number
-}
-
-const initialFloors: Floor[] = [
-  {
-    id: "floor-1",
-    name: "Pietro 1 - Open Space",
-    canvasWidth: 1400,
-    canvasHeight: 900,
-    elements: [
-      { id: "desk-1", type: "desk", x: 100, y: 100, width: 80, height: 60, rotation: 0, name: "Biurko A-1", capacity: 1 },
-      { id: "desk-2", type: "desk", x: 200, y: 100, width: 80, height: 60, rotation: 0, name: "Biurko A-2", capacity: 1 },
-      { id: "desk-3", type: "desk", x: 300, y: 100, width: 80, height: 60, rotation: 0, name: "Biurko A-3", capacity: 1 },
-      { id: "room-1", type: "room", x: 500, y: 80, width: 200, height: 150, rotation: 0, name: "Sala Alfa", capacity: 8 },
-    ],
-    desksCount: 3,
-    roomsCount: 1,
-  },
-  {
-    id: "floor-2",
-    name: "Pietro 2 - Zespoly",
-    canvasWidth: 1200,
-    canvasHeight: 800,
-    elements: [
-      { id: "desk-4", type: "desk", x: 100, y: 100, width: 80, height: 60, rotation: 0, name: "Biurko B-1", capacity: 1 },
-      { id: "room-2", type: "room", x: 300, y: 100, width: 180, height: 120, rotation: 0, name: "Sala Beta", capacity: 6 },
-      { id: "room-3", type: "room", x: 500, y: 100, width: 160, height: 100, rotation: 0, name: "Sala Gamma", capacity: 4 },
-    ],
-    desksCount: 1,
-    roomsCount: 2,
-  },
-]
-
 export default function FloorManagementPage() {
-  const [floors, setFloors] = useState<Floor[]>(initialFloors)
-  const [editingFloor, setEditingFloor] = useState<Floor | null>(null)
+  const { floorPlans, upsertFloorPlan, deleteFloorPlan } = useReservation()
+  const [editingFloor, setEditingFloor] = useState<FloorPlan | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [newFloorName, setNewFloorName] = useState("")
   const [newFloorWidth, setNewFloorWidth] = useState(1200)
   const [newFloorHeight, setNewFloorHeight] = useState(800)
   const [isNewFloorDialogOpen, setIsNewFloorDialogOpen] = useState(false)
 
-  const handleSaveFloor = (
+  const floors = useMemo(
+    () => floorPlans.map((floor) => ({
+      ...floor,
+      desksCount: floor.elements.filter((e) => e.type === "desk").length,
+      roomsCount: floor.elements.filter((e) => e.type === "room").length,
+    })),
+    [floorPlans]
+  )
+
+  const handleSaveFloor = async (
     elements: FloorElement[],
     floorName: string,
     canvasSize: { width: number; height: number }
   ) => {
-    if (editingFloor) {
-      setFloors(floors.map(f => 
-        f.id === editingFloor.id 
-          ? {
-              ...f,
-              name: floorName,
-              elements,
-              canvasWidth: canvasSize.width,
-              canvasHeight: canvasSize.height,
-              desksCount: elements.filter(e => e.type === "desk").length,
-              roomsCount: elements.filter(e => e.type === "room").length,
-            }
-          : f
-      ))
-    }
+    if (!editingFloor) return
+
+    await upsertFloorPlan({
+      ...editingFloor,
+      name: floorName,
+      canvasWidth: canvasSize.width,
+      canvasHeight: canvasSize.height,
+      elements: elements as any,
+      updatedAt: new Date().toISOString(),
+    })
+
     setIsEditorOpen(false)
     setEditingFloor(null)
   }
 
-  const handleCreateFloor = () => {
+  const handleCreateFloor = async () => {
     if (!newFloorName.trim()) return
-    
-    const newFloor: Floor = {
+
+    const maxFloor = Math.max(0, ...floorPlans.map((f) => f.floorNumber))
+    const newFloor: FloorPlan = {
       id: `floor-${Date.now()}`,
       name: newFloorName,
+      floorNumber: maxFloor + 1,
       elements: [],
       canvasWidth: Math.max(400, newFloorWidth),
       canvasHeight: Math.max(300, newFloorHeight),
-      desksCount: 0,
-      roomsCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }
-    setFloors([...floors, newFloor])
+
+    await upsertFloorPlan(newFloor)
     setNewFloorName("")
     setNewFloorWidth(1200)
     setNewFloorHeight(800)
@@ -125,11 +94,11 @@ export default function FloorManagementPage() {
     setIsEditorOpen(true)
   }
 
-  const handleDeleteFloor = (floorId: string) => {
-    setFloors(floors.filter(f => f.id !== floorId))
+  const handleDeleteFloor = async (floorId: string) => {
+    await deleteFloorPlan(floorId)
   }
 
-  const handleEditFloor = (floor: Floor) => {
+  const handleEditFloor = (floor: FloorPlan) => {
     setEditingFloor(floor)
     setIsEditorOpen(true)
   }
@@ -147,9 +116,9 @@ export default function FloorManagementPage() {
           </Button>
         </div>
         <FloorPlanEditor
-          initialElements={editingFloor.elements}
+          initialElements={editingFloor.elements as any}
           floorName={editingFloor.name}
-          initialCanvasSize={{ width: editingFloor.canvasWidth, height: editingFloor.canvasHeight }}
+          initialCanvasSize={{ width: editingFloor.canvasWidth || 1200, height: editingFloor.canvasHeight || 800 }}
           onSave={handleSaveFloor}
         />
       </div>
@@ -247,17 +216,17 @@ export default function FloorManagementPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="flex-1 gap-2"
                   onClick={() => handleEditFloor(floor)}
                 >
                   <Edit className="h-4 w-4" />
                   Edytuj
                 </Button>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive"
                   onClick={() => handleDeleteFloor(floor.id)}

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
+import { ClerkProvider } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
@@ -39,15 +39,6 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased">
         <ClerkProvider>
-          <header className="flex items-center justify-end gap-2 border-b px-4 py-3">
-            <Show when="signed-out">
-              <SignInButton />
-              <SignUpButton />
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
-          </header>
           {children}
           <Analytics />
         </ClerkProvider>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -43,23 +43,6 @@ interface Equipment {
   returnDate?: string
 }
 
-const equipment: Equipment[] = [
-  { id: "1", name: "MacBook Pro 16\" M3", category: "laptops", status: "available", serialNumber: "MBP-2024-001", description: "Apple M3 Pro, 18GB RAM, 512GB SSD" },
-  { id: "2", name: "MacBook Pro 14\" M3", category: "laptops", status: "borrowed", serialNumber: "MBP-2024-002", description: "Apple M3, 16GB RAM, 512GB SSD", borrowedBy: "Anna Nowak", returnDate: "18.03.2026" },
-  { id: "3", name: "Dell XPS 15", category: "laptops", status: "available", serialNumber: "DELL-2024-001", description: "Intel i7, 32GB RAM, 1TB SSD" },
-  { id: "4", name: "ThinkPad X1 Carbon", category: "laptops", status: "maintenance", serialNumber: "TP-2023-015", description: "Intel i5, 16GB RAM, 512GB SSD - W serwisie" },
-  { id: "5", name: "Monitor Dell 27\" 4K", category: "monitors", status: "available", serialNumber: "MON-2024-001", description: "Dell U2723QE, USB-C, 4K UHD" },
-  { id: "6", name: "Monitor LG 32\" UltraWide", category: "monitors", status: "available", serialNumber: "MON-2024-002", description: "LG 32WQ75C-B, USB-C, QHD" },
-  { id: "7", name: "Monitor Samsung 24\"", category: "monitors", status: "borrowed", serialNumber: "MON-2023-010", description: "Samsung LS24A600, FHD", borrowedBy: "Piotr Wisniewski", returnDate: "20.03.2026" },
-  { id: "8", name: "Projektor Epson EB-L260F", category: "projectors", status: "available", serialNumber: "PROJ-2024-001", description: "4600 lumenow, Full HD, Laser" },
-  { id: "9", name: "Projektor BenQ MH560", category: "projectors", status: "available", serialNumber: "PROJ-2023-005", description: "3800 lumenow, Full HD" },
-  { id: "10", name: "Ford Focus", category: "vehicles", status: "available", serialNumber: "WW12345", description: "Samochod sluzbowy, benzyna, 2023" },
-  { id: "11", name: "Skoda Octavia", category: "vehicles", status: "borrowed", serialNumber: "WW54321", description: "Samochod sluzbowy, diesel, 2022", borrowedBy: "Maria Kowalczyk", returnDate: "15.03.2026" },
-  { id: "12", name: "Sluchawki Sony WH-1000XM5", category: "accessories", status: "available", serialNumber: "ACC-2024-001", description: "Bezprzewodowe, ANC" },
-  { id: "13", name: "Kamera internetowa Logitech Brio", category: "accessories", status: "available", serialNumber: "ACC-2024-002", description: "4K, HDR, autofocus" },
-  { id: "14", name: "Stacja dokujaca Thunderbolt", category: "accessories", status: "borrowed", serialNumber: "ACC-2023-008", description: "CalDigit TS4", borrowedBy: "Jan Kowalski", returnDate: "25.03.2026" },
-]
-
 const categoryInfo: Record<EquipmentCategory, { label: string; icon: React.ElementType }> = {
   laptops: { label: "Laptopy", icon: Laptop },
   monitors: { label: "Monitory", icon: Monitor },
@@ -69,6 +52,7 @@ const categoryInfo: Record<EquipmentCategory, { label: string; icon: React.Eleme
 }
 
 export default function SprzetPage() {
+  const [equipment, setEquipment] = useState<Equipment[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -76,6 +60,18 @@ export default function SprzetPage() {
   const [showBorrowDialog, setShowBorrowDialog] = useState(false)
   const [borrowStartDate, setBorrowStartDate] = useState<Date>(new Date())
   const [borrowEndDate, setBorrowEndDate] = useState<Date>(new Date())
+
+  const loadEquipment = async () => {
+    const response = await fetch('/api/equipment', { cache: 'no-store' })
+    if (!response.ok) return
+
+    const rows = await response.json()
+    setEquipment(rows)
+  }
+
+  useEffect(() => {
+    loadEquipment()
+  }, [])
 
   const filteredEquipment = equipment.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -88,6 +84,25 @@ export default function SprzetPage() {
   const handleBorrow = (item: Equipment) => {
     setSelectedEquipment(item)
     setShowBorrowDialog(true)
+  }
+
+  const submitBorrowRequest = async () => {
+    if (!selectedEquipment) return
+
+    const response = await fetch('/api/reservations/equipment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resourceId: selectedEquipment.id,
+        startDate: borrowStartDate.toISOString(),
+        endDate: borrowEndDate.toISOString(),
+      }),
+    })
+
+    if (response.ok) {
+      setShowBorrowDialog(false)
+      await loadEquipment()
+    }
   }
 
   const getStatusBadge = (status: EquipmentStatus) => {
@@ -349,7 +364,7 @@ export default function SprzetPage() {
               <X className="h-4 w-4 mr-2" />
               Anuluj
             </Button>
-            <Button onClick={() => setShowBorrowDialog(false)}>
+            <Button onClick={submitBorrowRequest}>
               <Check className="h-4 w-4 mr-2" />
               Zloez wniosek
             </Button>

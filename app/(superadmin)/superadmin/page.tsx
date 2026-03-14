@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,49 +14,36 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-const stats = [
-  {
-    name: "Aktywne firmy",
-    value: "24",
-    change: "+3 w tym miesiacu",
-    icon: Building2,
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
-  },
-  {
-    name: "Laczna liczba uzytkownikow",
-    value: "1,247",
-    change: "+156 w tym miesiacu",
-    icon: Users,
-    color: "text-emerald-500",
-    bgColor: "bg-emerald-500/10",
-  },
-  {
-    name: "Rezerwacje dzis",
-    value: "892",
-    change: "+12% vs wczoraj",
-    icon: Activity,
-    color: "text-amber-500",
-    bgColor: "bg-amber-500/10",
-  },
-  {
-    name: "MRR",
-    value: "48,200 PLN",
-    change: "+8% MoM",
-    icon: TrendingUp,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500/10",
-  },
-]
+const iconByStatName: Record<string, any> = {
+  "Aktywne firmy": Building2,
+  "Laczna liczba uzytkownikow": Users,
+  "Rezerwacje dzis": Activity,
+  MRR: TrendingUp,
+}
 
-const recentCompanies = [
-  { id: 1, name: "TechStart Sp. z o.o.", users: 45, plan: "Business", status: "active", joinedAt: "2 dni temu" },
-  { id: 2, name: "Marketing Pro", users: 23, plan: "Starter", status: "active", joinedAt: "5 dni temu" },
-  { id: 3, name: "Design Studio XYZ", users: 12, plan: "Starter", status: "trial", joinedAt: "tydzien temu" },
-  { id: 4, name: "FinanceHub", users: 89, plan: "Enterprise", status: "active", joinedAt: "2 tygodnie temu" },
-]
+const styleByStatName: Record<string, { color: string; bgColor: string }> = {
+  "Aktywne firmy": { color: "text-blue-500", bgColor: "bg-blue-500/10" },
+  "Laczna liczba uzytkownikow": { color: "text-emerald-500", bgColor: "bg-emerald-500/10" },
+  "Rezerwacje dzis": { color: "text-amber-500", bgColor: "bg-amber-500/10" },
+  MRR: { color: "text-purple-500", bgColor: "bg-purple-500/10" },
+}
 
 export default function SuperAdminDashboard() {
+  const [stats, setStats] = useState<Array<{ name: string; value: string; change: string }>>([])
+  const [recentCompanies, setRecentCompanies] = useState<Array<{ id: string; name: string; users: number; plan: string; status: string; joinedAt: string }>>([])
+
+  useEffect(() => {
+    const load = async () => {
+      const response = await fetch('/api/superadmin/stats', { cache: 'no-store' })
+      if (!response.ok) return
+      const data = await response.json()
+      setStats(data.stats || [])
+      setRecentCompanies(data.recentCompanies || [])
+    }
+
+    load()
+  }, [])
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -78,8 +66,11 @@ export default function SuperAdminDashboard() {
           <Card key={stat.name}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                <div className={`p-3 rounded-lg ${styleByStatName[stat.name]?.bgColor || "bg-muted"}`}>
+                  {(() => {
+                    const Icon = iconByStatName[stat.name] || Activity
+                    return <Icon className={`h-6 w-6 ${styleByStatName[stat.name]?.color || "text-muted-foreground"}`} />
+                  })()}
                 </div>
               </div>
               <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import {
   Monitor,
-import { useEffect, useState } from "react"
+  Users,
   Package,
   Calendar,
   Clock,
@@ -21,7 +21,6 @@ import { pl } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 
 interface Reservation {
-  const [reservations, setReservations] = useState<Reservation[]>([])
   id: string
   type: "desk" | "room" | "equipment"
   name: string
@@ -31,16 +30,6 @@ interface Reservation {
   endTime: string
   status: "active" | "upcoming" | "completed" | "cancelled"
 }
-
-const reservations: Reservation[] = [
-  { id: "1", type: "desk", name: "Biurko A-12", location: "Strefa A, Pietro 1", date: new Date(), startTime: "09:00", endTime: "17:00", status: "active" },
-  { id: "2", type: "room", name: "Sala Konferencyjna B", location: "Pietro 1", date: new Date(Date.now() + 86400000), startTime: "10:00", endTime: "12:00", status: "upcoming" },
-  { id: "3", type: "equipment", name: "MacBook Pro 16\"", location: "Magazyn IT", date: new Date(Date.now() + 86400000 * 2), startTime: "08:00", endTime: "18:00", status: "upcoming" },
-  { id: "4", type: "desk", name: "Biurko C-05", location: "Strefa C, Pietro 2", date: new Date(Date.now() + 86400000 * 3), startTime: "09:00", endTime: "17:00", status: "upcoming" },
-  { id: "5", type: "room", name: "Sala D - Duza", location: "Pietro 2", date: new Date(Date.now() - 86400000), startTime: "14:00", endTime: "16:00", status: "completed" },
-  { id: "6", type: "equipment", name: "Projektor Epson", location: "Magazyn IT", date: new Date(Date.now() - 86400000 * 2), startTime: "09:00", endTime: "18:00", status: "completed" },
-  { id: "7", type: "desk", name: "Biurko B-03", location: "Strefa B, Pietro 1", date: new Date(Date.now() - 86400000 * 3), startTime: "09:00", endTime: "17:00", status: "cancelled" },
-]
 
 const getTypeIcon = (type: string) => {
   switch (type) {
@@ -58,24 +47,11 @@ const getTypeIcon = (type: string) => {
 const getTypeName = (type: string) => {
   switch (type) {
     case "desk":
-  const confirmCancelReservation = async () => {
-    if (!selectedReservation) return
-
-    const response = await fetch(`/api/reservations/${selectedReservation.id}/cancel`, {
-      method: "PATCH",
-    })
-
-    if (response.ok) {
-      await loadReservations()
-      setShowCancelDialog(false)
-      setSelectedReservation(null)
-    }
-  }
       return "Biurko"
     case "room":
       return "Sala"
     case "equipment":
-            <Button variant="destructive" onClick={confirmCancelReservation}>
+      return "Sprzet"
     default:
       return "Rezerwacja"
   }
@@ -97,8 +73,37 @@ const getStatusBadge = (status: string) => {
 }
 
 export default function RezerwacjePage() {
+  const [reservations, setReservations] = useState<Reservation[]>([])
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+
+  const loadReservations = async () => {
+    const response = await fetch("/api/reservations?mine=1", { cache: "no-store" })
+    if (!response.ok) return
+
+    const rows = await response.json()
+    setReservations(
+      rows.map((row: any) => {
+        const start = new Date(row.startAt)
+        const end = new Date(row.endAt)
+
+        return {
+          id: row.id,
+          type: row.type,
+          name: row.name,
+          location: row.location,
+          date: new Date(row.date),
+          startTime: start.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }),
+          endTime: end.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }),
+          status: row.status,
+        } as Reservation
+      })
+    )
+  }
+
+  useEffect(() => {
+    loadReservations()
+  }, [])
 
   const activeReservations = reservations.filter(r => r.status === "active" || r.status === "upcoming")
   const pastReservations = reservations.filter(r => r.status === "completed" || r.status === "cancelled")
@@ -108,10 +113,24 @@ export default function RezerwacjePage() {
     setShowCancelDialog(true)
   }
 
+  const confirmCancelReservation = async () => {
+    if (!selectedReservation) return
+
+    const response = await fetch(`/api/reservations/${selectedReservation.id}/cancel`, {
+      method: "PATCH",
+    })
+
+    if (response.ok) {
+      await loadReservations()
+      setShowCancelDialog(false)
+      setSelectedReservation(null)
+    }
+  }
+
   const formatDate = (date: Date) => {
     const today = new Date()
     const tomorrow = new Date(Date.now() + 86400000)
-    
+
     if (date.toDateString() === today.toDateString()) {
       return "Dzis"
     } else if (date.toDateString() === tomorrow.toDateString()) {
@@ -266,7 +285,6 @@ export default function RezerwacjePage() {
         </TabsContent>
       </Tabs>
 
-      {/* Cancel Confirmation Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent>
           <DialogHeader>
@@ -300,7 +318,7 @@ export default function RezerwacjePage() {
             <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
               Nie, zachowaj
             </Button>
-            <Button variant="destructive" onClick={() => setShowCancelDialog(false)}>
+            <Button variant="destructive" onClick={confirmCancelReservation}>
               Tak, anuluj
             </Button>
           </DialogFooter>

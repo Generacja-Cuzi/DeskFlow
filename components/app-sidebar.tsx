@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { useClerk, useUser } from "@clerk/nextjs"
 import {
   LayoutDashboard,
   Monitor,
@@ -44,6 +45,8 @@ const superAdminNavigation = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { signOut } = useClerk()
+  const { user } = useUser()
   const { logo, fallback, primaryColor, companyName } = useCompanyLogo()
   const [impersonatedCompanyName, setImpersonatedCompanyName] = useState<string | null>(null)
 
@@ -63,9 +66,10 @@ export function AppSidebar() {
   }, [])
 
   const currentUser = {
-    name: "Jan Kowalski",
-    email: "jan.kowalski@firma.pl",
-    role: "superadmin" as const,
+    name: user?.fullName || user?.firstName || "Uzytkownik",
+    email: user?.primaryEmailAddress?.emailAddress || "",
+    role: ((user?.publicMetadata?.role as string) || "superadmin") as "superadmin" | "admin" | "user",
+    imageUrl: user?.imageUrl,
   }
 
   const isImpersonating = !!impersonatedCompanyName
@@ -191,9 +195,13 @@ export function AppSidebar() {
       <div className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-2">
           <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm">
-              JK
-            </AvatarFallback>
+            {currentUser.imageUrl ? (
+              <AvatarImage src={currentUser.imageUrl} alt={currentUser.name} />
+            ) : (
+              <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm">
+                {currentUser.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            )}
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{currentUser.name}</p>
@@ -202,7 +210,12 @@ export function AppSidebar() {
               {isImpersonating ? "admin firmy" : currentUser.role}
             </p>
           </div>
-          <Button variant="ghost" size="icon" className="text-sidebar-foreground/60 hover:text-sidebar-foreground">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            onClick={() => signOut()}
+          >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>

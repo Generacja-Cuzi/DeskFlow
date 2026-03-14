@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -85,9 +85,37 @@ const resources = [
   { id: 5, name: "Ford Focus", type: "Pojazd", location: "Parking", status: "borrowed" },
 ]
 
+const statIconByName: Record<string, any> = {
+  "Aktywne rezerwacje": Calendar,
+  Uzytkownicy: Users,
+  "Dostepne biurka": Monitor,
+  "Wypozyczony sprzet": Package,
+}
+
 export default function AdminPage() {
+  const [statsData, setStatsData] = useState(stats)
+  const [usageDataState, setUsageDataState] = useState(usageData)
+  const [monthlyDataState, setMonthlyDataState] = useState(monthlyData)
+  const [pendingRequestsState, setPendingRequestsState] = useState(pendingRequests)
+  const [usersState, setUsersState] = useState(users)
+  const [resourcesState, setResourcesState] = useState(resources)
   const [showAddResourceDialog, setShowAddResourceDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+
+  useEffect(() => {
+    const load = async () => {
+      const response = await fetch('/api/admin/overview', { cache: 'no-store' })
+      if (!response.ok) return
+      const data = await response.json()
+      setStatsData(data.stats || stats)
+      setUsageDataState(data.usageData || usageData)
+      setMonthlyDataState(data.monthlyData || monthlyData)
+      setPendingRequestsState(data.pendingRequests || pendingRequests)
+      setUsersState(data.users || users)
+      setResourcesState(data.resources || resources)
+    }
+    load()
+  }, [])
 
   const handleApprove = (id: number) => {
     console.log("[v0] Approved request:", id)
@@ -120,11 +148,14 @@ export default function AdminPage() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        {stats.map((stat) => (
+        {statsData.map((stat) => (
           <Card key={stat.name}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                {(() => {
+                  const Icon = (stat as any).icon || statIconByName[stat.name] || Calendar
+                  return <Icon className={`h-8 w-8 ${stat.color}`} />
+                })()}
                 <Badge variant="secondary" className="text-xs">
                   <TrendingUp className="h-3 w-3 mr-1" />
                   {stat.change}
@@ -149,7 +180,7 @@ export default function AdminPage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={usageData}>
+                <BarChart data={usageDataState}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="name" className="text-xs" />
                   <YAxis className="text-xs" />
@@ -177,7 +208,7 @@ export default function AdminPage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyData}>
+                <AreaChart data={monthlyDataState}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="name" className="text-xs" />
                   <YAxis className="text-xs" />
@@ -212,7 +243,7 @@ export default function AdminPage() {
               </CardTitle>
               <CardDescription>Wnioski wymagajace akceptacji</CardDescription>
             </div>
-            <Badge variant="secondary">{pendingRequests.length} oczekujace</Badge>
+            <Badge variant="secondary">{pendingRequestsState.length} oczekujace</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -227,7 +258,7 @@ export default function AdminPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pendingRequests.map((request) => (
+              {pendingRequestsState.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell className="font-medium">{request.user}</TableCell>
                   <TableCell>
@@ -306,7 +337,7 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {resources.map((resource) => (
+                  {resourcesState.map((resource) => (
                     <TableRow key={resource.id}>
                       <TableCell className="font-medium">{resource.name}</TableCell>
                       <TableCell>
@@ -376,7 +407,7 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {usersState.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell>{user.email}</TableCell>

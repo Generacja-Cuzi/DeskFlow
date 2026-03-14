@@ -9,7 +9,7 @@ export async function getActor() {
 
   if (!userId) {
     const fallback = await db.query.users.findFirst({
-      where: eq(users.email, 'jan.kowalski@firma.pl'),
+      where: eq(users.email, '272715@student.pwr.edu.pl'),
     })
 
     return {

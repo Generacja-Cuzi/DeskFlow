@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -69,67 +69,9 @@ type Company = {
   createdAt: string
 }
 
-const initialCompanies: Company[] = [
-  {
-    id: "1",
-    name: "TechStart Sp. z o.o.",
-    slug: "techstart",
-    users: 45,
-    plan: "business",
-    status: "active",
-    primaryColor: "#3b82f6",
-    secondaryColor: "#10b981",
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Marketing Pro",
-    slug: "marketingpro",
-    users: 23,
-    plan: "starter",
-    status: "active",
-    primaryColor: "#8b5cf6",
-    secondaryColor: "#f59e0b",
-    createdAt: "2024-02-01",
-  },
-  {
-    id: "3",
-    name: "Design Studio XYZ",
-    slug: "designxyz",
-    users: 12,
-    plan: "starter",
-    status: "trial",
-    primaryColor: "#ec4899",
-    secondaryColor: "#06b6d4",
-    createdAt: "2024-03-05",
-  },
-  {
-    id: "4",
-    name: "FinanceHub",
-    slug: "financehub",
-    users: 89,
-    plan: "enterprise",
-    status: "active",
-    primaryColor: "#059669",
-    secondaryColor: "#3b82f6",
-    createdAt: "2024-01-02",
-  },
-  {
-    id: "5",
-    name: "CreativeAgency",
-    slug: "creativeagency",
-    users: 34,
-    plan: "business",
-    status: "active",
-    primaryColor: "#f97316",
-    secondaryColor: "#8b5cf6",
-    createdAt: "2024-02-20",
-  },
-]
-
 export default function CompaniesPage() {
   const router = useRouter()
-  const [companies, setCompanies] = useState<Company[]>(initialCompanies)
+  const [companies, setCompanies] = useState<Company[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -148,15 +90,26 @@ export default function CompaniesPage() {
       c.slug.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleCreateCompany = () => {
-    const company: Company = {
-      id: `company-${Date.now()}`,
-      ...newCompany,
-      users: 0,
-      status: "trial",
-      createdAt: new Date().toISOString().split("T")[0],
-    }
-    setCompanies([...companies, company])
+  const loadCompanies = async () => {
+    const response = await fetch('/api/superadmin/companies', { cache: 'no-store' })
+    if (!response.ok) return
+    const data = await response.json()
+    setCompanies(data)
+  }
+
+  useEffect(() => {
+    loadCompanies()
+  }, [])
+
+  const handleCreateCompany = async () => {
+    const response = await fetch('/api/superadmin/companies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCompany),
+    })
+    if (!response.ok) return
+
+    await loadCompanies()
     setIsCreateDialogOpen(false)
     setNewCompany({
       name: "",
@@ -167,15 +120,28 @@ export default function CompaniesPage() {
     })
   }
 
-  const handleUpdateCompany = () => {
+  const handleUpdateCompany = async () => {
     if (!selectedCompany) return
-    setCompanies(companies.map((c) => (c.id === selectedCompany.id ? selectedCompany : c)))
+
+    const response = await fetch(`/api/superadmin/companies/${selectedCompany.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(selectedCompany),
+    })
+
+    if (!response.ok) return
+
+    await loadCompanies()
     setIsEditDialogOpen(false)
     setSelectedCompany(null)
   }
 
-  const handleDeleteCompany = (id: string) => {
-    setCompanies(companies.filter((c) => c.id !== id))
+  const handleDeleteCompany = async (id: string) => {
+    const response = await fetch(`/api/superadmin/companies/${id}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) return
+    await loadCompanies()
   }
 
   const enterCompanyAsAdmin = (company: Company) => {
