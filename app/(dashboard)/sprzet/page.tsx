@@ -154,6 +154,48 @@ export default function SprzetPage() {
   const borrowedCount = equipment.filter(e => e.status === "borrowed").length
   const pendingCount = equipment.filter(e => e.workflowStatus === "pending").length
 
+  const renderActionButton = (item: Equipment) => {
+    const baseClassName = "w-full h-10 font-medium"
+
+    if (item.status === "available" && !item.workflowStatus) {
+      return (
+        <Button className={baseClassName} onClick={() => handleBorrow(item)}>
+          Zloz wniosek o wypozyczenie
+        </Button>
+      )
+    }
+
+    if (item.workflowStatus === "pending") {
+      return (
+        <Button variant="secondary" className={baseClassName} disabled>
+          Wniosek oczekuje na akceptacje
+        </Button>
+      )
+    }
+
+    if (item.workflowStatus === "approved") {
+      return (
+        <Button variant="secondary" className={baseClassName} disabled>
+          Zaakceptowano - czeka na wydanie
+        </Button>
+      )
+    }
+
+    if (item.status === "borrowed") {
+      return (
+        <Button variant="secondary" className={baseClassName} disabled>
+          Niedostepny
+        </Button>
+      )
+    }
+
+    return (
+      <Button variant="secondary" className={baseClassName} disabled>
+        W serwisie
+      </Button>
+    )
+  }
+
   return (
     <div className="p-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -240,7 +282,7 @@ export default function SprzetPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredEquipment.map((item) => (
           <Card key={item.id} className={cn(
-            "transition-all",
+            "transition-all h-full flex flex-col",
             item.status === "available" && "hover:shadow-md hover:border-accent/50"
           )}>
             <CardHeader className="pb-2">
@@ -256,7 +298,7 @@ export default function SprzetPage() {
                 {getStatusBadge(item.status)}
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 flex-1 flex flex-col">
               <div>
                 <CardTitle className="text-base">{item.name}</CardTitle>
                 <CardDescription className="text-xs mt-1">
@@ -284,28 +326,8 @@ export default function SprzetPage() {
                 </div>
               )}
 
-              <div className="pt-2">
-                {item.status === "available" && !item.workflowStatus ? (
-                  <Button className="w-full" onClick={() => handleBorrow(item)}>
-                    Zloz wniosek o wypozyczenie
-                  </Button>
-                ) : item.workflowStatus === "pending" ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    Wniosek oczekuje na akceptacje
-                  </Button>
-                ) : item.workflowStatus === "approved" ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    Zaakceptowano - czeka na wydanie
-                  </Button>
-                ) : item.status === "borrowed" ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    Niedostepny
-                  </Button>
-                ) : (
-                  <Button variant="outline" className="w-full" disabled>
-                    W serwisie
-                  </Button>
-                )}
+              <div className="pt-2 mt-auto">
+                {renderActionButton(item)}
               </div>
             </CardContent>
           </Card>

@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { floorElements, reservations, resources, userCompanyMemberships, users } from '@/lib/db/schema'
+import { companies, floorElements, reservations, resources, subscriptionPackages, userCompanyMemberships, users } from '@/lib/db/schema'
 import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
@@ -17,7 +17,7 @@ function toPolishType(type: string) {
   return type
 }
 
-const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories']
+const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories'] as const
 const reservationBlockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming']
 
 function getCurrentHalfHourWindow() {
@@ -49,7 +49,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const [membershipsRows, resourcesRows, reservationRows, desksRows] = await Promise.all([
+  const [membershipsRows, resourcesRows, reservationRows, desksRows, companyRow] = await Promise.all([
     db.query.userCompanyMemberships.findMany({
       where: eq(userCompanyMemberships.companyId, companyId),
       with: {
@@ -66,7 +66,12 @@ export async function GET() {
         floor: true,
       },
     }),
+    db.query.companies.findFirst({ where: eq(companies.id, companyId) }),
   ])
+
+  const packageRow = companyRow
+    ? await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, companyRow.plan) })
+    : null
 
   const companyDeskRows = desksRows.filter((desk) => desk.floor.companyId === companyId)
   const { start: windowStart, end: windowEnd } = getCurrentHalfHourWindow()
@@ -92,13 +97,16 @@ export async function GET() {
   const activeReservationsCount = reservationRows.filter((r) => r.status === 'active' || r.status === 'upcoming').length
   const availableDesksCount = companyDeskRows.filter((desk) => !occupiedDeskIds.has(desk.id)).length
   const desksCount = companyDeskRows.length
+  const availableEquipmentCount = resourcesRows.filter((resource) => resource.status === 'available').length
+  const usersLimit = packageRow?.maxUsers || usersRows.length || 1
+  const totalEquipmentCount = resourcesRows.length
   const borrowedEquipmentCount = resourcesRows.filter((r) => r.status === 'borrowed').length
 
   const stats = [
     { name: 'Aktywne rezerwacje', value: String(activeReservationsCount), change: '+0%', icon: 'Calendar', color: 'text-primary' },
-    { name: 'Uzytkownicy', value: String(usersRows.length), change: '+0%', icon: 'Users', color: 'text-accent' },
+    { name: 'Uzytkownicy', value: `${usersRows.length}/${usersLimit}`, change: '+0%', icon: 'Users', color: 'text-accent' },
     { name: 'Dostepne biurka', value: `${availableDesksCount}/${desksCount || 1}`, change: '0%', icon: 'Monitor', color: 'text-chart-3' },
-    { name: 'Wypozyczony sprzet', value: String(borrowedEquipmentCount), change: '0%', icon: 'Package', color: 'text-chart-5' },
+    { name: 'Dostepny sprzet', value: `${availableEquipmentCount}/${totalEquipmentCount || 1}`, change: '0%', icon: 'Package', color: 'text-chart-5' },
   ]
 
   const weekdays = ['Pon', 'Wt', 'Sr', 'Czw', 'Pt']

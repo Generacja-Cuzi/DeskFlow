@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { reservations } from '@/lib/db/schema'
+import { sendReservationCancelledEmail } from '@/lib/server/notification-emails'
 import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
@@ -23,6 +24,9 @@ export async function DELETE(_: Request, context: { params: Promise<{ reservatio
 
   const existing = await db.query.reservations.findFirst({
     where: and(eq(reservations.id, reservationId), eq(reservations.companyId, companyId)),
+    with: {
+      user: true,
+    },
   })
 
   if (!existing) {
@@ -30,6 +34,15 @@ export async function DELETE(_: Request, context: { params: Promise<{ reservatio
   }
 
   await db.delete(reservations).where(and(eq(reservations.id, reservationId), eq(reservations.companyId, companyId)))
+
+  await sendReservationCancelledEmail({
+    recipient: {
+      email: existing.user?.email,
+      name: existing.user?.name,
+    },
+    reservationLabel: existing.name,
+    reason: 'Rezerwacja zostala usunieta przez administratora.',
+  })
 
   return NextResponse.json({ ok: true })
 }

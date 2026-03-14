@@ -1,8 +1,8 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { companies, companyBranding } from '@/lib/db/schema'
+import { companies, companyBranding, userCompanyMemberships, users } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 
 export async function PATCH(request: Request, context: { params: Promise<{ companyId: string }> }) {
@@ -24,6 +24,42 @@ export async function PATCH(request: Request, context: { params: Promise<{ compa
       status: body.status,
     })
     .where(eq(companies.id, companyId))
+
+  if (body.status === 'suspended') {
+    const memberships = await db.query.userCompanyMemberships.findMany({ where: eq(userCompanyMemberships.companyId, companyId) })
+
+    await db
+      .update(userCompanyMemberships)
+      .set({ status: 'inactive' })
+      .where(eq(userCompanyMemberships.companyId, companyId))
+
+    if (memberships.length) {
+      const uniqueUserIds = [...new Set(memberships.map((membership) => membership.userId))]
+
+      await db
+        .update(users)
+        .set({ status: 'inactive' })
+        .where(inArray(users.id, uniqueUserIds))
+    }
+  }
+
+  if (body.status === 'active' || body.status === 'trial') {
+    const memberships = await db.query.userCompanyMemberships.findMany({ where: eq(userCompanyMemberships.companyId, companyId) })
+
+    await db
+      .update(userCompanyMemberships)
+      .set({ status: 'active' })
+      .where(eq(userCompanyMemberships.companyId, companyId))
+
+    if (memberships.length) {
+      const uniqueUserIds = [...new Set(memberships.map((membership) => membership.userId))]
+
+      await db
+        .update(users)
+        .set({ status: 'active' })
+        .where(inArray(users.id, uniqueUserIds))
+    }
+  }
 
   await db
     .insert(companyBranding)

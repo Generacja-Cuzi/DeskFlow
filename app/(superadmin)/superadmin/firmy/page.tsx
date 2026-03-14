@@ -62,11 +62,18 @@ type Company = {
   slug: string
   logo?: string
   users: number
-  plan: "starter" | "business" | "enterprise"
+  maxUsers: number
+  plan: "starter" | "growth" | "enterprise"
   status: "active" | "trial" | "suspended"
   primaryColor: string
   secondaryColor: string
   createdAt: string
+}
+
+type PackageOption = {
+  id: string
+  name: string
+  maxUsers: number
 }
 
 export default function CompaniesPage() {
@@ -74,6 +81,7 @@ export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
+  const [packageOptions, setPackageOptions] = useState<PackageOption[]>([])
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isAddAdminDialogOpen, setIsAddAdminDialogOpen] = useState(false)
@@ -98,10 +106,20 @@ export default function CompaniesPage() {
   )
 
   const loadCompanies = async () => {
-    const response = await fetch('/api/superadmin/companies', { cache: 'no-store' })
-    if (!response.ok) return
-    const data = await response.json()
-    setCompanies(data)
+    const [companiesResponse, packagesResponse] = await Promise.all([
+      fetch('/api/superadmin/companies', { cache: 'no-store' }),
+      fetch('/api/superadmin/subscriptions', { cache: 'no-store' }),
+    ])
+
+    if (companiesResponse.ok) {
+      const data = await companiesResponse.json()
+      setCompanies(data)
+    }
+
+    if (packagesResponse.ok) {
+      const payload = await packagesResponse.json()
+      setPackageOptions(payload.packages || [])
+    }
   }
 
   useEffect(() => {
@@ -214,8 +232,8 @@ export default function CompaniesPage() {
     switch (plan) {
       case "starter":
         return <Badge variant="secondary">Starter</Badge>
-      case "business":
-        return <Badge className="bg-blue-500">Business</Badge>
+      case "growth":
+        return <Badge className="bg-blue-500">Growth</Badge>
       case "enterprise":
         return <Badge className="bg-purple-500">Enterprise</Badge>
     }
@@ -288,9 +306,11 @@ export default function CompaniesPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="starter">Starter</SelectItem>
-                    <SelectItem value="business">Business</SelectItem>
-                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                    {packageOptions.map((pkg) => (
+                      <SelectItem key={pkg.id} value={pkg.id}>
+                        {pkg.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -366,7 +386,7 @@ export default function CompaniesPage() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4 text-muted-foreground" />
-                      {company.users}
+                      {company.users}/{company.maxUsers || 0}
                     </div>
                   </TableCell>
                   <TableCell>{getPlanBadge(company.plan)}</TableCell>
@@ -469,9 +489,11 @@ export default function CompaniesPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="starter">Starter</SelectItem>
-                        <SelectItem value="business">Business</SelectItem>
-                        <SelectItem value="enterprise">Enterprise</SelectItem>
+                        {packageOptions.map((pkg) => (
+                          <SelectItem key={pkg.id} value={pkg.id}>
+                            {pkg.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

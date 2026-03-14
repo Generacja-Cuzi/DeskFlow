@@ -6,7 +6,7 @@ import { reservations, resources } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
-const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming']
+const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
 
 function parseDateTime(date: string, value?: string) {
   if (!value) {

@@ -46,7 +46,7 @@ const fallbackStats = [
   { name: "Aktywne rezerwacje", value: "156", change: "+12%", icon: Calendar, color: "text-primary" },
   { name: "Uzytkownicy", value: "89", change: "+5%", icon: Users, color: "text-accent" },
   { name: "Dostepne biurka", value: "24/40", change: "60%", icon: Monitor, color: "text-chart-3" },
-  { name: "Wypozyczony sprzet", value: "18", change: "-3%", icon: Package, color: "text-chart-5" },
+  { name: "Dostepny sprzet", value: "5/100", change: "0%", icon: Package, color: "text-chart-5" },
 ]
 
 const initialUsageData: Array<{ name: string; biurka: number; sale: number; sprzet: number }> = []
@@ -167,7 +167,14 @@ const statIconByName: Record<string, any> = {
   "Aktywne rezerwacje": Calendar,
   Uzytkownicy: Users,
   "Dostepne biurka": Monitor,
-  "Wypozyczony sprzet": Package,
+  "Dostepny sprzet": Package,
+}
+
+const statStyleByName: Record<string, { icon: string; bg: string }> = {
+  "Aktywne rezerwacje": { icon: "text-blue-500", bg: "bg-blue-500/10" },
+  Uzytkownicy: { icon: "text-emerald-500", bg: "bg-emerald-500/10" },
+  "Dostepne biurka": { icon: "text-amber-500", bg: "bg-amber-500/10" },
+  "Dostepny sprzet": { icon: "text-purple-500", bg: "bg-purple-500/10" },
 }
 
 export default function AdminPage() {
@@ -514,12 +521,15 @@ export default function AdminPage() {
   }
 
   const formatTimeLabel = (value: string) => {
-    const parsed = new Date(value)
-    if (Number.isNaN(parsed.valueOf())) {
+    if (!value) {
       return "--:--"
     }
 
-    return parsed.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })
+    if (!value.includes("T")) {
+      return value.slice(0, 5)
+    }
+
+    return value.slice(11, 16)
   }
 
   return (
@@ -547,7 +557,12 @@ export default function AdminPage() {
               <div className="flex items-center justify-between">
                 {(() => {
                   const Icon = (stat as any).icon || statIconByName[stat.name] || Calendar
-                  return <Icon className={`h-8 w-8 ${stat.color}`} />
+                  const iconStyle = statStyleByName[stat.name] || { icon: "text-muted-foreground", bg: "bg-muted" }
+                  return (
+                    <div className={`p-3 rounded-lg ${iconStyle.bg}`}>
+                      <Icon className={`h-6 w-6 ${iconStyle.icon}`} />
+                    </div>
+                  )
                 })()}
                 <Badge variant="secondary" className="text-xs">
                   <TrendingUp className="h-3 w-3 mr-1" />

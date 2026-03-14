@@ -3,10 +3,11 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { reservations, resources, users } from '@/lib/db/schema'
+import { sendOverdueEquipmentEmail } from '@/lib/server/notification-emails'
 import { getActiveCompanyId } from '@/lib/server/company'
 
-const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories']
-const workflowStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming']
+const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories'] as const
+const workflowStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
 
 export async function GET() {
   const companyId = await getActiveCompanyId()
@@ -30,6 +31,29 @@ export async function GET() {
       },
     }),
   ])
+
+  const now = new Date()
+  const overdueIssued = activeBorrows.filter((reservation) => reservation.status === 'issued' && reservation.endAt < now)
+
+  if (overdueIssued.length > 0) {
+    await db
+      .update(reservations)
+      .set({ status: 'active' })
+      .where(inArray(reservations.id, overdueIssued.map((reservation) => reservation.id)))
+
+    await Promise.allSettled(
+      overdueIssued.map((reservation) =>
+        sendOverdueEquipmentEmail({
+          recipient: {
+            email: reservation.user?.email,
+            name: reservation.user?.name,
+          },
+          resourceName: reservation.name,
+          dueAt: reservation.endAt,
+        })
+      )
+    )
+  }
 
   const activeBorrowByResource = new Map<string, (typeof activeBorrows)[number]>()
   for (const reservation of activeBorrows) {

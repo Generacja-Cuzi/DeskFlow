@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { reservations, resources } from '@/lib/db/schema'
+import { sendResourceIssuedEmail, sendResourceReturnedEmail } from '@/lib/server/notification-emails'
 import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
@@ -43,6 +44,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         eq(reservations.status, 'approved')
       ),
       orderBy: [desc(reservations.createdAt)],
+      with: {
+        user: true,
+      },
     })
 
     if (!approvedReservation) {
@@ -59,6 +63,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
 
     await db.update(resources).set({ status: 'borrowed' }).where(eq(resources.id, resourceId))
 
+    await sendResourceIssuedEmail({
+      recipient: {
+        email: approvedReservation.user?.email,
+        name: approvedReservation.user?.name,
+      },
+      resourceName: resource.name,
+      endAt: approvedReservation.endAt,
+    })
+
     return NextResponse.json({ ok: true })
   }
 
@@ -70,6 +83,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       inArray(reservations.status, ['issued', 'active', 'upcoming'])
     ),
     orderBy: [desc(reservations.createdAt)],
+    with: {
+      user: true,
+    },
   })
 
   if (!issuedReservation) {
@@ -86,6 +102,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     .where(eq(reservations.id, issuedReservation.id))
 
   await db.update(resources).set({ status: 'available' }).where(eq(resources.id, resourceId))
+
+  await sendResourceReturnedEmail({
+    recipient: {
+      email: issuedReservation.user?.email,
+      name: issuedReservation.user?.name,
+    },
+    resourceName: resource.name,
+  })
 
   return NextResponse.json({ ok: true })
 }

@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { companies, companyBranding, users } from '@/lib/db/schema'
+import { companies, companyBranding, subscriptionPackages, users } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 
 export async function GET() {
@@ -19,6 +19,9 @@ export async function GET() {
     },
   })
 
+  const packages = await db.query.subscriptionPackages.findMany()
+  const packageById = new Map(packages.map((pkg) => [pkg.id, pkg]))
+
   return NextResponse.json(
     rows.map((company) => ({
       id: company.id,
@@ -26,6 +29,7 @@ export async function GET() {
       slug: company.slug,
       users: company.users.length,
       plan: company.plan,
+      maxUsers: packageById.get(company.plan)?.maxUsers || 0,
       status: company.status,
       primaryColor: company.branding?.primaryColor || '#3b82f6',
       secondaryColor: company.branding?.secondaryColor || '#10b981',
@@ -42,13 +46,20 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
+  const plan = typeof body.plan === 'string' ? body.plan : 'starter'
+  const packageRow = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, plan) })
+
+  if (!packageRow) {
+    return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+  }
+
   const id = crypto.randomUUID()
 
   await db.insert(companies).values({
     id,
     name: body.name,
     slug: body.slug,
-    plan: body.plan || 'starter',
+    plan,
     status: 'trial',
   })
 

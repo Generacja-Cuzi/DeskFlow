@@ -77,10 +77,11 @@ function fromMinutes(totalMinutes: number) {
 }
 
 function toHourLabel(value: string) {
-  return new Date(value).toLocaleTimeString("pl-PL", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  if (!value.includes("T")) {
+    return value.slice(0, 5)
+  }
+
+  return value.slice(11, 16)
 }
 
 function busySlotToInterval(slot: BusySlot, dayStart: string, dayEnd: string) {
@@ -396,8 +397,10 @@ export default function BiurkaPage() {
             mode="reservation"
             enableReservation={false}
             clickableTypes={["desk"]}
+            showContextLayout
             availabilityByTarget={availability}
             selectedRange={{ startTime, endTime }}
+            dayRange={{ startTime: DAY_START, endTime: DAY_END }}
             onElementClick={handleMapElementClick}
           />
         </TabsContent>

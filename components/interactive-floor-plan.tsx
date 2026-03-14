@@ -35,7 +35,6 @@ import {
 } from "lucide-react"
 import { FloorElement, InteractiveFloorPlanProps, DeskReservationRequest, RoomReservationRequest } from "@/lib/types"
 import { useReservation, useCurrentFloorPlan, useFilteredElements } from "@/lib/contexts/reservation-context"
-import { useBranding } from "@/lib/contexts/branding-context"
 
 interface ReservationDialogProps {
   element: FloorElement | null
@@ -223,11 +222,11 @@ export function InteractiveFloorPlan({
   showContextLayout = false,
   availabilityByTarget,
   selectedRange,
+  dayRange,
   onElementClick,
   className = "",
 }: Partial<InteractiveFloorPlanProps>) {
   const { currentFloor, setCurrentFloor, floorPlans, reserveDesk, reserveRoom, viewState, updateFilters, selectElement } = useReservation()
-  const { branding } = useBranding()
   const currentFloorPlan = useCurrentFloorPlan()
   const filteredElements = useFilteredElements()
   
@@ -264,8 +263,39 @@ export function InteractiveFloorPlan({
   }, [toMinutes])
 
   const toHour = useCallback((value: string) => {
-    return new Date(value).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })
+    if (!value.includes("T")) {
+      return value.slice(0, 5)
+    }
+
+    return value.slice(11, 16)
   }, [])
+
+  const busySlotToInterval = useCallback(
+    (slot: { startAt: string; endAt: string }) => {
+      const dayStart = dayRange?.startTime || "07:00"
+      const dayEnd = dayRange?.endTime || "19:00"
+
+      const dayStartMinutes = toMinutes(dayStart)
+      const dayEndMinutes = toMinutes(dayEnd)
+
+      const start = toMinutes(toHour(slot.startAt))
+      let end = toMinutes(toHour(slot.endAt))
+
+      if (end <= start) {
+        end = dayEndMinutes
+      }
+
+      const clampedStart = Math.max(dayStartMinutes, Math.min(start, dayEndMinutes))
+      const clampedEnd = Math.max(dayStartMinutes, Math.min(end, dayEndMinutes))
+
+      if (clampedEnd <= clampedStart) {
+        return null
+      }
+
+      return { start: clampedStart, end: clampedEnd }
+    },
+    [dayRange?.endTime, dayRange?.startTime, toHour, toMinutes]
+  )
 
   const handleElementClick = useCallback((element: FloorElement) => {
     setSelectedElement(element)
@@ -322,38 +352,78 @@ export function InteractiveFloorPlan({
     if (element.type === "wall") return "#6b7280"
     if (element.type === "door") return "#f59e0b"
 
+    const isInteractiveType = element.type === "desk" || element.type === "room"
+    const isClickableType = isInteractiveType && clickableTypes.includes(element.type)
+
+    if (showContextLayout && isInteractiveType && !isClickableType) {
+      return "#9ca3af"
+    }
+
     if (
       selectedRange &&
       availabilityByTarget &&
-      (element.type === "desk" || element.type === "room")
+      isInteractiveType
     ) {
       const busySlots = availabilityByTarget[element.id]
       if (!busySlots) {
-        return element.type === "desk" ? branding.primaryColor : branding.secondaryColor
+        return "#22c55e"
       }
 
-      const isBusyForRange = busySlots.some((slot) =>
-        isOverlapping(selectedRange.startTime, selectedRange.endTime, toHour(slot.startAt), toHour(slot.endAt))
+      const intervals = busySlots
+        .map((slot) => busySlotToInterval(slot))
+        .filter((slot): slot is { start: number; end: number } => Boolean(slot))
+        .sort((a, b) => a.start - b.start)
+
+      const merged: Array<{ start: number; end: number }> = []
+      for (const interval of intervals) {
+        if (!merged.length || interval.start > merged[merged.length - 1].end) {
+          merged.push({ ...interval })
+          continue
+        }
+
+        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, interval.end)
+      }
+
+      const dayStart = toMinutes(dayRange?.startTime || "07:00")
+      const dayEnd = toMinutes(dayRange?.endTime || "19:00")
+      const isUnavailableWholeDay =
+        merged.length > 0 && merged[0].start <= dayStart && merged[merged.length - 1].end >= dayEnd
+
+      if (isUnavailableWholeDay) {
+        return "#ef4444"
+      }
+
+      const isBusyForRange = merged.some((slot) =>
+        isOverlapping(
+          selectedRange.startTime,
+          selectedRange.endTime,
+          `${String(Math.floor(slot.start / 60)).padStart(2, "0")}:${String(slot.start % 60).padStart(2, "0")}`,
+          `${String(Math.floor(slot.end / 60)).padStart(2, "0")}:${String(slot.end % 60).padStart(2, "0")}`
+        )
       )
 
       if (isBusyForRange) {
-        return branding.primaryColor
+        return "#7c3aed"
       }
 
-      return branding.secondaryColor
+      return "#22c55e"
     }
-    
+
+    if (isInteractiveType && !isClickableType) {
+      return "#9ca3af"
+    }
+
     switch (element.status) {
       case "available":
-        return branding.secondaryColor
+        return "#22c55e"
       case "reserved":
-        return branding.primaryColor
+        return "#7c3aed"
       case "occupied":
         return "#ef4444"
       case "maintenance":
         return "#f97316"
       default:
-        return element.type === "desk" ? branding.primaryColor : branding.secondaryColor
+        return element.type === "desk" ? "#22c55e" : "#22c55e"
     }
   }
 
@@ -624,24 +694,24 @@ export function InteractiveFloorPlan({
             <div className="flex items-center gap-2">
               <div 
                 className="w-4 h-4 rounded" 
-                style={{ backgroundColor: branding.secondaryColor }} 
+                style={{ backgroundColor: "#22c55e" }} 
               />
-              <span className="text-sm">Dostępne</span>
+              <span className="text-sm">Dostepne w wybranym przedziale</span>
             </div>
             <div className="flex items-center gap-2">
               <div 
                 className="w-4 h-4 rounded" 
-                style={{ backgroundColor: branding.primaryColor }} 
+                style={{ backgroundColor: "#7c3aed" }} 
               />
-              <span className="text-sm">Zarezerwowane</span>
+              <span className="text-sm">Zarezerwowane w wybranym przedziale</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-red-500" />
-              <span className="text-sm">Zajęte</span>
+              <span className="text-sm">Niedostepne caly dzien</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-gray-500" />
-              <span className="text-sm">Ściany</span>
+              <div className="w-4 h-4 rounded bg-gray-400" />
+              <span className="text-sm">Elementy pogladowe (nieklikalne)</span>
             </div>
           </div>
         </CardContent>

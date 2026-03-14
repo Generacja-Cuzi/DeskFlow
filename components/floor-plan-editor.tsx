@@ -40,6 +40,7 @@ export type FloorElement = {
   name: string
   capacity?: number
   equipment?: string[]
+  zone?: string
   labelFontFamily?: string
   labelFontSize?: number
   labelColor?: string
@@ -624,6 +625,17 @@ export function FloorPlanEditor({
                   />
                 </div>
               </div>
+              {(selectedElement.type === "room" || selectedElement.type === "desk") && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Strefa</Label>
+                  <Input
+                    value={selectedElement.zone || ""}
+                    onChange={(e) => updateSelectedElement({ zone: e.target.value })}
+                    placeholder="np. Strefa A"
+                    className="h-9"
+                  />
+                </div>
+              )}
               {(selectedElement.type === "room" || selectedElement.type === "desk") && (
                 <div className="space-y-2">
                   <Label className="text-xs">Pojemnosc (osoby)</Label>

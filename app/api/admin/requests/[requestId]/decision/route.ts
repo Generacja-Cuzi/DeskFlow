@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
 import { reservations } from '@/lib/db/schema'
+import { sendReservationDecisionEmail } from '@/lib/server/notification-emails'
 import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
@@ -34,6 +35,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ reque
 
   const reservation = await db.query.reservations.findFirst({
     where: and(eq(reservations.id, requestId), eq(reservations.companyId, companyId)),
+    with: {
+      user: true,
+    },
   })
 
   if (!reservation) {
@@ -53,6 +57,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ reque
       })
       .where(and(eq(reservations.id, requestId), eq(reservations.companyId, companyId)))
 
+    await sendReservationDecisionEmail({
+      recipient: {
+        email: reservation.user?.email,
+        name: reservation.user?.name,
+      },
+      reservationLabel: reservation.name,
+      decision: 'approved',
+    })
+
     return NextResponse.json({ ok: true })
   }
 
@@ -63,6 +76,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ reque
       status: 'rejected',
     })
     .where(and(eq(reservations.id, requestId), eq(reservations.companyId, companyId)))
+
+  await sendReservationDecisionEmail({
+    recipient: {
+      email: reservation.user?.email,
+      name: reservation.user?.name,
+    },
+    reservationLabel: reservation.name,
+    decision: 'rejected',
+  })
 
   return NextResponse.json({ ok: true })
 }

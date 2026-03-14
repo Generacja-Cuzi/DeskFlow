@@ -101,8 +101,8 @@ export default function RezerwacjePage() {
           name: row.name,
           location: row.location,
           date: new Date(row.date),
-          startTime: start.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }),
-          endTime: end.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }),
+          startTime: typeof row.startAt === "string" ? row.startAt.slice(11, 16) : start.toISOString().slice(11, 16),
+          endTime: typeof row.endAt === "string" ? row.endAt.slice(11, 16) : end.toISOString().slice(11, 16),
           status: row.status,
         } as Reservation
       })

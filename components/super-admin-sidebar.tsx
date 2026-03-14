@@ -7,10 +7,8 @@ import {
   LayoutDashboard,
   Building2,
   Users,
-  Settings,
   LogOut,
   Shield,
-  Palette,
   CreditCard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -23,7 +21,6 @@ const navigation = [
   { name: "Firmy", href: "/superadmin/firmy", icon: Building2 },
   { name: "Uzytkownicy", href: "/superadmin/uzytkownicy", icon: Users },
   { name: "Subskrypcje", href: "/superadmin/subskrypcje", icon: CreditCard },
-  { name: "Ustawienia", href: "/superadmin/ustawienia", icon: Settings },
 ]
 
 export function SuperAdminSidebar() {

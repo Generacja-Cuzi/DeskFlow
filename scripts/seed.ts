@@ -22,7 +22,7 @@ async function seed() {
         id: companyId,
         name: 'TechStart Sp. z o.o.',
         slug: 'techstart',
-        plan: 'business',
+        plan: 'growth',
         status: 'active',
       },
       {
@@ -291,8 +291,6 @@ async function seed() {
   ])
 
   await db.insert(resources).values([
-    { id: 'res-1', companyId, name: 'Biurko A-01', type: 'Biurko', category: 'desks', location: 'Strefa A, P1', status: 'available' },
-    { id: 'res-2', companyId, name: 'Sala Konferencyjna A', type: 'Sala', category: 'rooms', location: 'Pietro 1', status: 'occupied' },
     { id: 'res-3', companyId, name: 'MacBook Pro 16" M3', type: 'Laptop', category: 'laptops', location: 'Magazyn IT', serialNumber: 'MBP-2024-001', description: 'Apple M3 Pro, 18GB RAM, 512GB SSD', status: 'available' },
     { id: 'res-4', companyId, name: 'MacBook Pro 14" M3', type: 'Laptop', category: 'laptops', location: 'Magazyn IT', serialNumber: 'MBP-2024-002', description: 'Apple M3, 16GB RAM, 512GB SSD', status: 'borrowed' },
     { id: 'res-5', companyId, name: 'Dell XPS 15', type: 'Laptop', category: 'laptops', location: 'Magazyn IT', serialNumber: 'DELL-2024-001', description: 'Intel i7, 32GB RAM, 1TB SSD', status: 'available' },

@@ -5,7 +5,7 @@ import { db } from '@/lib/db/client'
 import { reservations } from '@/lib/db/schema'
 import { getActiveCompanyId } from '@/lib/server/company'
 
-const activeStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming']
+const activeStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
 
 export async function GET(request: Request) {
   const companyId = await getActiveCompanyId()

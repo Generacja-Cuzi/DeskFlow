@@ -3,6 +3,7 @@ import {
   boolean,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -10,12 +11,33 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core'
 
+export const companyPlanEnum = pgEnum('company_plan_enum', ['starter', 'growth', 'enterprise'])
+export const companyStatusEnum = pgEnum('company_status_enum', ['active', 'trial', 'suspended'])
+export const userRoleEnum = pgEnum('user_role_enum', ['superadmin', 'admin', 'user'])
+export const userStatusEnum = pgEnum('user_status_enum', ['active', 'inactive', 'suspended'])
+export const membershipRoleEnum = pgEnum('membership_role_enum', ['admin', 'user'])
+export const membershipStatusEnum = pgEnum('membership_status_enum', ['active', 'inactive', 'suspended'])
+export const floorElementTypeEnum = pgEnum('floor_element_type_enum', ['desk', 'room', 'wall', 'door'])
+export const resourceStatusEnum = pgEnum('resource_status_enum', ['available', 'borrowed', 'maintenance'])
+export const resourceCategoryEnum = pgEnum('resource_category_enum', ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories'])
+export const reservationTypeEnum = pgEnum('reservation_type_enum', ['desk', 'room', 'equipment'])
+export const reservationStatusEnum = pgEnum('reservation_status_enum', [
+  'pending',
+  'approved',
+  'issued',
+  'active',
+  'upcoming',
+  'completed',
+  'cancelled',
+  'rejected',
+])
+
 export const companies = pgTable('companies', {
   id: text('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
   slug: varchar('slug', { length: 255 }).notNull().unique(),
-  plan: varchar('plan', { length: 32 }).notNull().default('starter'),
-  status: varchar('status', { length: 32 }).notNull().default('active'),
+  plan: companyPlanEnum('plan').notNull().default('starter'),
+  status: companyStatusEnum('status').notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -25,8 +47,8 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 320 }).notNull().unique(),
   department: varchar('department', { length: 128 }),
-  role: varchar('role', { length: 32 }).notNull().default('user'),
-  status: varchar('status', { length: 32 }).notNull().default('active'),
+  role: userRoleEnum('role').notNull().default('user'),
+  status: userStatusEnum('status').notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -36,8 +58,8 @@ export const userCompanyMemberships = pgTable(
     id: text('id').primaryKey(),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     companyId: text('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
-    role: varchar('role', { length: 32 }).notNull().default('user'),
-    status: varchar('status', { length: 32 }).notNull().default('active'),
+    role: membershipRoleEnum('role').notNull().default('user'),
+    status: membershipStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
@@ -77,7 +99,7 @@ export const floors = pgTable('floors', {
 export const floorElements = pgTable('floor_elements', {
   id: text('id').primaryKey(),
   floorId: text('floor_id').notNull().references(() => floors.id, { onDelete: 'cascade' }),
-  type: varchar('type', { length: 32 }).notNull(),
+  type: floorElementTypeEnum('type').notNull(),
   x: integer('x').notNull(),
   y: integer('y').notNull(),
   width: integer('width').notNull(),
@@ -108,18 +130,29 @@ export const resources = pgTable('resources', {
   companyId: text('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   type: varchar('type', { length: 64 }).notNull(),
-  category: varchar('category', { length: 64 }),
+  category: resourceCategoryEnum('category'),
   location: varchar('location', { length: 255 }).notNull(),
   serialNumber: varchar('serial_number', { length: 128 }),
   description: text('description'),
-  status: varchar('status', { length: 32 }).notNull().default('available'),
+  status: resourceStatusEnum('status').notNull().default('available'),
+})
+
+export const subscriptionPackages = pgTable('subscription_packages', {
+  id: text('id').primaryKey(),
+  name: varchar('name', { length: 128 }).notNull(),
+  price: integer('price').notNull().default(0),
+  maxUsers: integer('max_users').notNull().default(1),
+  maxResources: integer('max_resources').notNull().default(100),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const reservations = pgTable('reservations', {
   id: text('id').primaryKey(),
   companyId: text('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
-  type: varchar('type', { length: 32 }).notNull(),
+  type: reservationTypeEnum('type').notNull(),
   targetId: text('target_id').notNull(),
   resourceId: text('resource_id').references(() => resources.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 255 }).notNull(),
@@ -130,7 +163,7 @@ export const reservations = pgTable('reservations', {
   timeSlot: varchar('time_slot', { length: 32 }),
   meetingTitle: varchar('meeting_title', { length: 255 }),
   participantCount: integer('participant_count'),
-  status: varchar('status', { length: 32 }).notNull().default('active'),
+  status: reservationStatusEnum('status').notNull().default('active'),
   pendingApproval: boolean('pending_approval').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })

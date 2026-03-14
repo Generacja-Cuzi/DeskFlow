@@ -2,7 +2,7 @@ import { and, count, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { companies, reservations, users } from '@/lib/db/schema'
+import { companies, reservations, subscriptionPackages, users } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 
 export async function GET() {
@@ -19,6 +19,13 @@ export async function GET() {
   ])
 
   const activeCompanies = await db.select({ value: count() }).from(companies).where(eq(companies.status, 'active'))
+  const allCompanyRows = await db.query.companies.findMany()
+  const activeOrTrialCompanies = allCompanyRows.filter((company) => company.status === 'active' || company.status === 'trial')
+  const packages = await db.query.subscriptionPackages.findMany()
+
+  const priceByPlan = new Map(packages.map((pkg) => [pkg.id, pkg.price]))
+  const computedMrr = activeOrTrialCompanies.reduce((sum, company) => sum + (priceByPlan.get(company.plan) || 0), 0)
+
   const today = new Date().toISOString().slice(0, 10)
   const todaysReservations = await db
     .select({ value: count() })
@@ -49,8 +56,8 @@ export async function GET() {
       },
       {
         name: 'MRR',
-        value: `${(activeCompanies[0]?.value || 0) * 1990} PLN`,
-        change: 'Szacunek',
+        value: `${computedMrr} PLN`,
+        change: 'Suma pakietow aktywnych firm',
       },
     ],
     recentCompanies: recent.map((company) => ({

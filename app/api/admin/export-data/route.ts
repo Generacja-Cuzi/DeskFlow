@@ -6,7 +6,7 @@ import { companyBranding, reservations, resources, userCompanyMemberships, users
 import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
-const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories']
+const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories'] as const
 
 export async function GET() {
   const companyId = await getActiveCompanyId()

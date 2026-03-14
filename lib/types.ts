@@ -188,6 +188,7 @@ export interface InteractiveFloorPlanProps {
   filters?: ReservationFilters
   availabilityByTarget?: Record<string, Array<{ startAt: string; endAt: string }>>
   selectedRange?: { startTime: string; endTime: string }
+  dayRange?: { startTime: string; endTime: string }
   className?: string
   showContextLayout?: boolean
 }

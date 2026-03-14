@@ -6,7 +6,7 @@ import { resources } from '@/lib/db/schema'
 import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
-const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories']
+const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories'] as const
 
 export async function POST(request: Request) {
   const companyId = await getActiveCompanyId()
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const serialNumber = typeof body.serialNumber === 'string' ? body.serialNumber.trim() : ''
   const description = typeof body.description === 'string' ? body.description.trim() : ''
 
-  if (!name || !location || !equipmentCategories.includes(category)) {
+  if (!name || !location || !(equipmentCategories as readonly string[]).includes(category)) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
