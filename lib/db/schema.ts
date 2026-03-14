@@ -121,7 +121,17 @@ export const companiesRelations = relations(companies, ({ many, one }) => ({
   floors: many(floors),
   resources: many(resources),
   reservations: many(reservations),
-  branding: one(companyBranding),
+  branding: one(companyBranding, {
+    fields: [companies.id],
+    references: [companyBranding.companyId],
+  }),
+}))
+
+export const companyBrandingRelations = relations(companyBranding, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyBranding.companyId],
+    references: [companies.id],
+  }),
 }))
 
 export const floorsRelations = relations(floors, ({ many, one }) => ({

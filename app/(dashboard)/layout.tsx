@@ -1,9 +1,8 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import { SignInButton, SignUpButton } from "@clerk/nextjs"
 import { auth } from "@clerk/nextjs/server"
 import { BrandingProvider } from "@/lib/contexts/branding-context"
 import { ReservationProvider } from "@/lib/contexts/reservation-context"
-import { Button } from "@/components/ui/button"
+import { AuthLanding } from "@/components/auth-landing"
 
 export default async function DashboardLayout({
   children,
@@ -14,22 +13,10 @@ export default async function DashboardLayout({
 
   if (!userId) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <div className="w-full max-w-md rounded-xl border bg-card p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">Witaj w DeskFlow</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Zaloguj sie albo utworz konto, aby wejsc do panelu.
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <SignInButton>
-              <Button>Zaloguj sie</Button>
-            </SignInButton>
-            <SignUpButton>
-              <Button variant="outline">Zarejestruj sie</Button>
-            </SignUpButton>
-          </div>
-        </div>
-      </div>
+      <AuthLanding
+        title="Zarzadzaj biurem z jednego miejsca"
+        subtitle="Zaloguj sie lub utworz konto, aby przejsc do panelu DeskFlow i zarzadzac rezerwacjami, zasobami oraz uzytkownikami firmy."
+      />
     )
   }
 
