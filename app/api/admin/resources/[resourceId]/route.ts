@@ -6,6 +6,7 @@ import { reservations, resources } from '@/lib/db/schema'
 import { sendResourceChangedEmail, sendReservationCancelledEmail } from '@/lib/server/notification-emails'
 import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories'] as const
 
@@ -104,6 +105,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         changeDescription: changes.join('; '),
       })
     }
+
+    if (activeReservation?.userId) {
+      await createNotification({
+        companyId,
+        userId: activeReservation.userId,
+        type: 'equipment',
+        title: 'Aktualizacja wypozyczonego zasobu',
+        message: `Administrator zaktualizowal dane zasobu ${name}.`,
+      })
+    }
   }
 
   return NextResponse.json({ ok: true })
@@ -153,6 +164,20 @@ export async function DELETE(_: Request, context: { params: Promise<{ resourceId
         reason: `Zasob ${existing.name} zostal usuniety przez administratora.`,
       })
     )
+  )
+
+  await Promise.allSettled(
+    linkedReservations
+      .filter((reservation) => Boolean(reservation.userId))
+      .map((reservation) =>
+        createNotification({
+          companyId,
+          userId: reservation.userId!,
+          type: 'rejection',
+          title: 'Rezerwacja anulowana',
+          message: `Twoja rezerwacja ${reservation.name} zostala anulowana, bo zasob ${existing.name} zostal usuniety.`,
+        })
+      )
   )
 
   return NextResponse.json({ ok: true })

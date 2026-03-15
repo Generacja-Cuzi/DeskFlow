@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { floorElements, reservations, resources } from '@/lib/db/schema'
 import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 export async function PATCH(_: Request, context: { params: Promise<{ reservationId: string }> }) {
   const { reservationId } = await context.params
@@ -55,6 +56,16 @@ export async function PATCH(_: Request, context: { params: Promise<{ reservation
       .update(resources)
       .set({ status: 'available' })
       .where(eq(resources.id, reservation.resourceId))
+  }
+
+  if (manager && !ownsReservation && reservation.userId) {
+    await createNotification({
+      companyId,
+      userId: reservation.userId,
+      type: 'rejection',
+      title: 'Rezerwacja anulowana',
+      message: `Administrator anulowal rezerwacje: ${reservation.name}.`,
+    })
   }
 
   return NextResponse.json({ ok: true })

@@ -29,7 +29,7 @@ const navigation = [
   { name: "Sale konferencyjne", href: "/sale", icon: Users },
   { name: "Sprzet", href: "/sprzet", icon: Package },
   { name: "Moje rezerwacje", href: "/rezerwacje", icon: Calendar },
-  { name: "Powiadomienia", href: "/powiadomienia", icon: Bell, badge: 3 },
+  { name: "Powiadomienia", href: "/powiadomienia", icon: Bell },
 ]
 
 const adminNavigation = [
@@ -51,6 +51,7 @@ export function AppSidebar() {
   const [resolvedRole, setResolvedRole] = useState<"superadmin" | "admin" | "user">("user")
   const [impersonatedCompanyName, setImpersonatedCompanyName] = useState<string | null>(null)
   const [membershipCount, setMembershipCount] = useState(0)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   useEffect(() => {
     const loadAuthState = async () => {
@@ -89,6 +90,35 @@ export function AppSidebar() {
     }
 
     loadAuthState()
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadUnreadCount = async () => {
+      const response = await fetch('/api/notifications', { cache: 'no-store' })
+      if (!response.ok || !mounted) {
+        return
+      }
+
+      const data = await response.json()
+      setUnreadNotifications(typeof data?.unreadCount === 'number' ? data.unreadCount : 0)
+    }
+
+    loadUnreadCount()
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        return
+      }
+
+      loadUnreadCount()
+    }, 10000)
+
+    return () => {
+      mounted = false
+      window.clearInterval(intervalId)
+    }
   }, [])
 
   const currentUser = {
@@ -208,9 +238,9 @@ export function AppSidebar() {
             >
               <item.icon className="h-5 w-5" />
               {item.name}
-              {item.badge && (
+              {item.href === '/powiadomienia' && unreadNotifications > 0 && (
                 <Badge variant="secondary" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground text-xs">
-                  {item.badge}
+                  {unreadNotifications}
                 </Badge>
               )}
             </Link>

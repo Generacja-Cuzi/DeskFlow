@@ -6,6 +6,7 @@ import { floorElements, floors, reservations } from '@/lib/db/schema'
 import { sendDeskOrRoomRemovedEmail } from '@/lib/server/notification-emails'
 import { getActiveCompanyId } from '@/lib/server/company'
 import { getFloorPlans } from '@/lib/server/floor-plans'
+import { createNotification } from '@/lib/server/notifications'
 
 const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
 
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
 
   const floorPlan = await request.json()
   const removedReservationNotifications: Array<{
+    userId?: string
     email?: string
     name?: string
     itemType: 'desk' | 'room'
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
           }
 
           removedReservationNotifications.push({
+            userId: reservation.userId || undefined,
             email: reservation.user?.email,
             name: reservation.user?.name,
             itemType: removedElement.type,
@@ -158,6 +161,20 @@ export async function POST(request: Request) {
         floorName: item.floorName,
       })
     )
+  )
+
+  await Promise.allSettled(
+    removedReservationNotifications
+      .filter((item) => Boolean(item.userId))
+      .map((item) =>
+        createNotification({
+          companyId,
+          userId: item.userId!,
+          type: 'rejection',
+          title: item.itemType === 'desk' ? 'Rezerwacja biurka anulowana' : 'Rezerwacja sali anulowana',
+          message: `${item.itemType === 'desk' ? 'Biurko' : 'Sala'} ${item.itemName} zostalo usuniete z planu pietra (${item.floorName}).`,
+        })
+      )
   )
 
   return NextResponse.json({ ok: true })

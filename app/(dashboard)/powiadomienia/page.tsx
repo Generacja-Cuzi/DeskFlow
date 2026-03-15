@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -26,60 +26,9 @@ interface Notification {
   type: "reservation" | "equipment" | "reminder" | "approval" | "rejection" | "info"
   title: string
   message: string
-  timestamp: Date
+  timestamp: string
   read: boolean
 }
-
-const notifications: Notification[] = [
-  {
-    id: "1",
-    type: "approval",
-    title: "Wniosek zaakceptowany",
-    message: "Twoj wniosek o wypozyczenie MacBook Pro 16\" zostal zaakceptowany.",
-    timestamp: new Date(Date.now() - 3600000),
-    read: false,
-  },
-  {
-    id: "2",
-    type: "reminder",
-    title: "Przypomnienie o rezerwacji",
-    message: "Twoja rezerwacja biurka A-12 rozpoczyna sie za 1 godzine.",
-    timestamp: new Date(Date.now() - 7200000),
-    read: false,
-  },
-  {
-    id: "3",
-    type: "equipment",
-    title: "Zbliża sie termin zwrotu",
-    message: "Pamietaj o zwrocie projektora Epson do 15.03.2026.",
-    timestamp: new Date(Date.now() - 86400000),
-    read: false,
-  },
-  {
-    id: "4",
-    type: "reservation",
-    title: "Rezerwacja potwierdzona",
-    message: "Sala Konferencyjna B zostala zarezerwowana na 12.03.2026, 10:00-12:00.",
-    timestamp: new Date(Date.now() - 86400000 * 2),
-    read: true,
-  },
-  {
-    id: "5",
-    type: "rejection",
-    title: "Wniosek odrzucony",
-    message: "Twoj wniosek o rezerwacje samochodu sluzbowego zostal odrzucony. Powod: Pojazd w serwisie.",
-    timestamp: new Date(Date.now() - 86400000 * 3),
-    read: true,
-  },
-  {
-    id: "6",
-    type: "info",
-    title: "Aktualizacja systemu",
-    message: "System DeskFlow zostal zaktualizowany. Sprawdz nowe funkcje!",
-    timestamp: new Date(Date.now() - 86400000 * 5),
-    read: true,
-  },
-]
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -100,7 +49,12 @@ const getNotificationIcon = (type: string) => {
   }
 }
 
-const formatTimestamp = (date: Date) => {
+const formatTimestamp = (timestamp: string) => {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.valueOf())) {
+    return "Przed chwila"
+  }
+
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
@@ -119,22 +73,74 @@ const formatTimestamp = (date: Date) => {
 }
 
 export default function PowiadomieniaPage() {
-  const [notificationsList, setNotificationsList] = useState(notifications)
+  const [notificationsList, setNotificationsList] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [requestError, setRequestError] = useState<string | null>(null)
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [pushNotifications, setPushNotifications] = useState(true)
   const [reminderNotifications, setReminderNotifications] = useState(true)
 
   const unreadCount = notificationsList.filter(n => !n.read).length
 
-  const markAllAsRead = () => {
+  const loadNotifications = async () => {
+    try {
+      const response = await fetch("/api/notifications", { cache: "no-store" })
+      if (!response.ok) {
+        setRequestError("Nie udalo sie pobrac powiadomien.")
+        return
+      }
+
+      const data = await response.json()
+      setNotificationsList(Array.isArray(data.notifications) ? data.notifications : [])
+      setRequestError(null)
+    } catch {
+      setRequestError("Nie udalo sie pobrac powiadomien.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadNotifications()
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") {
+        return
+      }
+
+      loadNotifications()
+    }, 10000)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
+
+  const markAllAsRead = async () => {
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mark-all-read" }),
+    })
+
     setNotificationsList(prev => prev.map(n => ({ ...n, read: true })))
   }
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    const target = notificationsList.find((notification) => notification.id === id)
+    if (!target || target.read) {
+      return
+    }
+
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mark-read", id }),
+    })
+
     setNotificationsList(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
   }
 
-  const deleteNotification = (id: string) => {
+  const deleteNotification = async (id: string) => {
+    await fetch(`/api/notifications?id=${encodeURIComponent(id)}`, { method: "DELETE" })
     setNotificationsList(prev => prev.filter(n => n.id !== id))
   }
 
@@ -146,6 +152,7 @@ export default function PowiadomieniaPage() {
           <p className="text-muted-foreground mt-1">
             Zarzadzaj swoimi powiadomieniami i ustawieniami
           </p>
+          {requestError && <p className="text-sm text-destructive mt-2">{requestError}</p>}
         </div>
         {unreadCount > 0 && (
           <Button variant="outline" onClick={markAllAsRead}>
@@ -164,7 +171,7 @@ export default function PowiadomieniaPage() {
             </div>
           )}
 
-          {notificationsList.length === 0 ? (
+          {!loading && notificationsList.length === 0 ? (
             <Card className="py-12">
               <CardContent className="text-center">
                 <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -173,6 +180,10 @@ export default function PowiadomieniaPage() {
                   Nie masz zadnych powiadomien
                 </p>
               </CardContent>
+            </Card>
+          ) : loading ? (
+            <Card className="py-12">
+              <CardContent className="text-center text-sm text-muted-foreground">Ladowanie powiadomien...</CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -185,7 +196,7 @@ export default function PowiadomieniaPage() {
                       "transition-all cursor-pointer hover:shadow-md",
                       !notification.read && "border-primary/50 bg-primary/5"
                     )}
-                    onClick={() => markAsRead(notification.id)}
+                    onClick={() => void markAsRead(notification.id)}
                   >
                     <CardContent className="p-4">
                       <div className="flex gap-4">
@@ -218,7 +229,7 @@ export default function PowiadomieniaPage() {
                                 className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  deleteNotification(notification.id)
+                                  void deleteNotification(notification.id)
                                 }}
                               >
                                 <Trash2 className="h-4 w-4" />

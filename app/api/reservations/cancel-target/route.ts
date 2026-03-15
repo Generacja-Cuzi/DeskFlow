@@ -6,6 +6,7 @@ import { floorElements, reservations, resources } from '@/lib/db/schema'
 import { sendReservationCancelledEmail } from '@/lib/server/notification-emails'
 import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -37,6 +38,16 @@ export async function POST(request: Request) {
         },
         reservationLabel: reservation.name,
       })
+
+      if (reservation.userId) {
+        await createNotification({
+          companyId,
+          userId: reservation.userId,
+          type: 'rejection',
+          title: 'Rezerwacja anulowana',
+          message: `Administrator anulowal rezerwacje: ${reservation.name}.`,
+        })
+      }
     }
   }
 

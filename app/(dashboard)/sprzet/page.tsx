@@ -65,6 +65,7 @@ export default function SprzetPage() {
   const [borrowEndDate, setBorrowEndDate] = useState<Date>(new Date())
   const [purpose, setPurpose] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [borrowDateError, setBorrowDateError] = useState<string | null>(null)
 
   const loadEquipment = async () => {
     const response = await fetch('/api/equipment', { cache: 'no-store' })
@@ -88,11 +89,19 @@ export default function SprzetPage() {
 
   const handleBorrow = (item: Equipment) => {
     setSelectedEquipment(item)
+    setBorrowDateError(null)
     setShowBorrowDialog(true)
   }
 
   const submitBorrowRequest = async () => {
     if (!selectedEquipment) return
+
+    if (borrowEndDate < borrowStartDate) {
+      setBorrowDateError("Data koncowa nie moze byc mniejsza niz data poczatkowa.")
+      return
+    }
+
+    setBorrowDateError(null)
 
     setSubmitting(true)
 
@@ -110,7 +119,15 @@ export default function SprzetPage() {
     if (response.ok) {
       setShowBorrowDialog(false)
       setPurpose("")
+      setBorrowDateError(null)
       await loadEquipment()
+    } else {
+      const payload = await response.json().catch(() => null)
+      if (typeof payload?.error === "string") {
+        setBorrowDateError(payload.error)
+      } else {
+        setBorrowDateError("Nie udalo sie zlozyc wniosku.")
+      }
     }
 
     setSubmitting(false)
@@ -379,7 +396,11 @@ export default function SprzetPage() {
                       <Calendar
                         mode="single"
                         selected={borrowStartDate}
-                        onSelect={(date) => date && setBorrowStartDate(date)}
+                        onSelect={(date) => {
+                          if (!date) return
+                          setBorrowStartDate(date)
+                          setBorrowDateError(null)
+                        }}
                         initialFocus
                       />
                     </PopoverContent>
@@ -401,7 +422,11 @@ export default function SprzetPage() {
                       <Calendar
                         mode="single"
                         selected={borrowEndDate}
-                        onSelect={(date) => date && setBorrowEndDate(date)}
+                        onSelect={(date) => {
+                          if (!date) return
+                          setBorrowEndDate(date)
+                          setBorrowDateError(null)
+                        }}
                         initialFocus
                       />
                     </PopoverContent>
@@ -430,6 +455,8 @@ export default function SprzetPage() {
                 Otrzymasz powiadomienie o statusie wniosku.
               </p>
             </div>
+
+            {borrowDateError && <p className="text-sm text-destructive">{borrowDateError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBorrowDialog(false)}>

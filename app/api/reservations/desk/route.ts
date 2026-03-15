@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { floorElements, reservations } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
 
@@ -111,6 +112,14 @@ export async function POST(request: Request) {
       reservedUntil: endAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
     })
     .where(and(eq(floorElements.id, body.deskId), eq(floorElements.type, 'desk')))
+
+  await createNotification({
+    companyId,
+    userId: actor.user.id,
+    type: 'reservation',
+    title: 'Rezerwacja biurka potwierdzona',
+    message: `Biurko ${desk.name} zostalo zarezerwowane na ${date}.`,
+  })
 
   return NextResponse.json({ ok: true })
 }

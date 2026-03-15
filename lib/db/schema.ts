@@ -31,6 +31,14 @@ export const reservationStatusEnum = pgEnum('reservation_status_enum', [
   'cancelled',
   'rejected',
 ])
+export const notificationTypeEnum = pgEnum('notification_type_enum', [
+  'reservation',
+  'equipment',
+  'reminder',
+  'approval',
+  'rejection',
+  'info',
+])
 
 export const companies = pgTable('companies', {
   id: text('id').primaryKey(),
@@ -168,6 +176,17 @@ export const reservations = pgTable('reservations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const notifications = pgTable('notifications', {
+  id: text('id').primaryKey(),
+  companyId: text('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: notificationTypeEnum('type').notNull().default('info'),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  read: boolean('read').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const companiesRelations = relations(companies, ({ many, one }) => ({
   users: many(users),
   memberships: many(userCompanyMemberships),
@@ -209,6 +228,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   memberships: many(userCompanyMemberships),
   reservations: many(reservations),
+  notifications: many(notifications),
 }))
 
 export const userCompanyMembershipsRelations = relations(userCompanyMemberships, ({ one }) => ({
@@ -242,5 +262,16 @@ export const reservationsRelations = relations(reservations, ({ one }) => ({
   resource: one(resources, {
     fields: [reservations.resourceId],
     references: [resources.id],
+  }),
+}))
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  company: one(companies, {
+    fields: [notifications.companyId],
+    references: [companies.id],
+  }),
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
   }),
 }))

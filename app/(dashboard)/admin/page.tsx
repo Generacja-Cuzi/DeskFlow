@@ -261,6 +261,18 @@ export default function AdminPage() {
     loadAdminReservations()
   }, [filterFromDate, filterToDate, filterFromTime, filterToTime])
 
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        return
+      }
+
+      void Promise.all([loadOverview(), loadAdminReservations()])
+    }, 10000)
+
+    return () => window.clearInterval(intervalId)
+  }, [filterFromDate, filterToDate, filterFromTime, filterToTime])
+
   const handleAddUser = async () => {
     const response = await fetch('/api/admin/users', {
       method: 'POST',

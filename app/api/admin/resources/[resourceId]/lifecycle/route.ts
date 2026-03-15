@@ -6,6 +6,7 @@ import { reservations, resources } from '@/lib/db/schema'
 import { sendResourceIssuedEmail, sendResourceReturnedEmail } from '@/lib/server/notification-emails'
 import { canManageCompany } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 export async function PATCH(request: Request, context: { params: Promise<{ resourceId: string }> }) {
   const companyId = await getActiveCompanyId()
@@ -72,6 +73,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       endAt: approvedReservation.endAt,
     })
 
+    if (approvedReservation.userId) {
+      await createNotification({
+        companyId,
+        userId: approvedReservation.userId,
+        type: 'equipment',
+        title: 'Sprzet zostal wydany',
+        message: `Administrator wydal Ci ${resource.name}. Termin zwrotu: ${approvedReservation.endAt.toISOString().slice(0, 10)}.`,
+      })
+    }
+
     return NextResponse.json({ ok: true })
   }
 
@@ -110,6 +121,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     },
     resourceName: resource.name,
   })
+
+  if (issuedReservation.userId) {
+    await createNotification({
+      companyId,
+      userId: issuedReservation.userId,
+      type: 'equipment',
+      title: 'Zwrot zakonczony',
+      message: `Administrator oznaczyl zwrot zasobu ${resource.name}.`,
+    })
+  }
 
   return NextResponse.json({ ok: true })
 }

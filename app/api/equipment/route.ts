@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { reservations, resources, users } from '@/lib/db/schema'
 import { sendOverdueEquipmentEmail } from '@/lib/server/notification-emails'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 const equipmentCategories = ['laptops', 'monitors', 'projectors', 'vehicles', 'accessories'] as const
 const workflowStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
@@ -52,6 +53,20 @@ export async function GET() {
           dueAt: reservation.endAt,
         })
       )
+    )
+
+    await Promise.allSettled(
+      overdueIssued
+        .filter((reservation) => Boolean(reservation.userId))
+        .map((reservation) =>
+          createNotification({
+            companyId,
+            userId: reservation.userId!,
+            type: 'reminder',
+            title: 'Termin zwrotu minol',
+            message: `Termin zwrotu zasobu ${reservation.name} minol dnia ${reservation.endAt.toISOString().slice(0, 10)}.`,
+          })
+        )
     )
   }
 

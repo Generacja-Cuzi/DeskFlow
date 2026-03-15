@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { reservations, resources } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification, createNotificationsForUsers, getAdminUserIds } from '@/lib/server/notifications'
 
 const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
 
@@ -35,6 +36,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
   }
 
+  if (!actor.user?.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const resource = await db.query.resources.findFirst({
     where: and(eq(resources.id, body.resourceId), eq(resources.companyId, companyId)),
   })
@@ -43,17 +48,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
   }
 
+  const requestedStartAt = typeof body.startDate === 'string' ? new Date(body.startDate) : null
   const date = typeof body.date === 'string'
     ? body.date
-    : typeof body.startDate === 'string'
-      ? new Date(body.startDate).toISOString().slice(0, 10)
+    : requestedStartAt && !Number.isNaN(requestedStartAt.valueOf())
+      ? requestedStartAt.toISOString().slice(0, 10)
       : null
 
   const startAt = parseDateTime(date || '', body.startDate || body.startTime)
   const endAt = parseDateTime(date || '', body.endDate || body.endTime)
 
-  if (!date || !startAt || !endAt || endAt <= startAt) {
+  if (!date || !startAt || !endAt) {
     return NextResponse.json({ error: 'Invalid reservation time range' }, { status: 400 })
+  }
+
+  if (endAt < startAt) {
+    return NextResponse.json({ error: 'Data koncowa nie moze byc mniejsza niz data poczatkowa' }, { status: 400 })
   }
 
   const equipmentReservations = await db.query.reservations.findMany({
@@ -78,7 +88,7 @@ export async function POST(request: Request) {
     .values({
       id: crypto.randomUUID(),
       companyId,
-      userId: actor.user?.id || null,
+      userId: actor.user.id,
       type: 'equipment',
       targetId: resource.id,
       resourceId: resource.id,
@@ -91,6 +101,25 @@ export async function POST(request: Request) {
       status: 'pending',
       pendingApproval: true,
     })
+
+  const adminIds = await getAdminUserIds(companyId)
+
+  await Promise.allSettled([
+    createNotification({
+      companyId,
+      userId: actor.user.id,
+      type: 'equipment',
+      title: 'Wniosek zostal wyslany',
+      message: `Twoj wniosek o wypozyczenie ${resource.name} oczekuje na decyzje administratora.`,
+    }),
+    createNotificationsForUsers({
+      companyId,
+      userIds: adminIds,
+      type: 'approval',
+      title: 'Nowy wniosek o wypozyczenie',
+      message: `${actor.user.name || 'Uzytkownik'} zlozyl(a) wniosek o ${resource.name}.`,
+    }),
+  ])
 
   return NextResponse.json({ ok: true })
 }

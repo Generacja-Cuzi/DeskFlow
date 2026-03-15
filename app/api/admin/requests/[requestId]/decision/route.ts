@@ -6,6 +6,7 @@ import { reservations } from '@/lib/db/schema'
 import { sendReservationDecisionEmail } from '@/lib/server/notification-emails'
 import { canManageCompany, getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 export async function PATCH(request: Request, context: { params: Promise<{ requestId: string }> }) {
   const actor = await getActor()
@@ -66,6 +67,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ reque
       decision: 'approved',
     })
 
+    if (reservation.userId) {
+      await createNotification({
+        companyId,
+        userId: reservation.userId,
+        type: 'approval',
+        title: 'Wniosek zaakceptowany',
+        message: `Administrator zaakceptowal Twoj wniosek o ${reservation.name}.`,
+      })
+    }
+
     return NextResponse.json({ ok: true })
   }
 
@@ -85,6 +96,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ reque
     reservationLabel: reservation.name,
     decision: 'rejected',
   })
+
+  if (reservation.userId) {
+    await createNotification({
+      companyId,
+      userId: reservation.userId,
+      type: 'rejection',
+      title: 'Wniosek odrzucony',
+      message: `Administrator odrzucil Twoj wniosek o ${reservation.name}.`,
+    })
+  }
 
   return NextResponse.json({ ok: true })
 }

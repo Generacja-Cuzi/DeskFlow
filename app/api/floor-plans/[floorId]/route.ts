@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { floorElements, floors, reservations } from '@/lib/db/schema'
 import { sendDeskOrRoomRemovedEmail } from '@/lib/server/notification-emails'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { createNotification } from '@/lib/server/notifications'
 
 const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
 
@@ -76,6 +77,25 @@ export async function DELETE(_: Request, context: { params: Promise<{ floorId: s
             floorName: floor.name,
           })
         })
+      )
+
+      await Promise.allSettled(
+        reservationsToCancel
+          .filter((reservation) => Boolean(reservation.userId))
+          .map((reservation) => {
+            const removedElement = byId.get(reservation.targetId)
+            if (!removedElement) {
+              return Promise.resolve()
+            }
+
+            return createNotification({
+              companyId,
+              userId: reservation.userId!,
+              type: 'rejection',
+              title: removedElement.type === 'desk' ? 'Rezerwacja biurka anulowana' : 'Rezerwacja sali anulowana',
+              message: `${removedElement.type === 'desk' ? 'Biurko' : 'Sala'} ${removedElement.name} zostalo usuniete razem z pietrem ${floor.name}.`,
+            })
+          })
       )
     }
   }
