@@ -103,6 +103,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         resourceName: name,
         changedBy: actor.user?.name || 'Administrator',
         changeDescription: changes.join('; '),
+        companyId,
+        userId: activeReservation.userId || undefined,
       })
     }
 
@@ -162,6 +164,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ resourceId
         },
         reservationLabel: reservation.name,
         reason: `Zasob ${existing.name} zostal usuniety przez administratora.`,
+        companyId,
+        userId: reservation.userId || undefined,
       })
     )
   )

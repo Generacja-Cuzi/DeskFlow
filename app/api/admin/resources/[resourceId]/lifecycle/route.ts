@@ -71,6 +71,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       },
       resourceName: resource.name,
       endAt: approvedReservation.endAt,
+      companyId,
+      userId: approvedReservation.userId || undefined,
     })
 
     if (approvedReservation.userId) {
@@ -120,6 +122,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       name: issuedReservation.user?.name,
     },
     resourceName: resource.name,
+    companyId,
+    userId: issuedReservation.userId || undefined,
   })
 
   if (issuedReservation.userId) {

@@ -36,6 +36,16 @@ function intervalsOverlap(startA: Date, endA: Date, startB: Date, endB: Date) {
   return startA < endB && startB < endA
 }
 
+function formatChangePercent(current: number, previous: number) {
+  if (previous <= 0) {
+    return current > 0 ? '+100%' : '0%'
+  }
+
+  const delta = ((current - previous) / previous) * 100
+  const rounded = Math.round(delta)
+  return `${rounded >= 0 ? '+' : ''}${rounded}%`
+}
+
 export async function GET() {
   const companyId = await getActiveCompanyId()
 
@@ -98,15 +108,28 @@ export async function GET() {
   const availableDesksCount = companyDeskRows.filter((desk) => !occupiedDeskIds.has(desk.id)).length
   const desksCount = companyDeskRows.length
   const availableEquipmentCount = resourcesRows.filter((resource) => resource.status === 'available').length
-  const usersLimit = packageRow?.maxUsers || usersRows.length || 1
+  const usersLimit = packageRow?.maxUsers ?? usersRows.length
   const totalEquipmentCount = resourcesRows.length
   const borrowedEquipmentCount = resourcesRows.filter((r) => r.status === 'borrowed').length
 
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+
+  const createdToday = reservationRows.filter((row) => row.createdAt >= todayStart && row.createdAt < tomorrowStart).length
+  const createdYesterday = reservationRows.filter((row) => row.createdAt >= yesterdayStart && row.createdAt < todayStart).length
+  const reservationsChange = formatChangePercent(createdToday, createdYesterday)
+
+  const userCapacityPercent = usersLimit > 0 ? Math.round((usersRows.length / usersLimit) * 100) : 0
+  const desksAvailablePercent = desksCount > 0 ? Math.round((availableDesksCount / desksCount) * 100) : 0
+  const equipmentAvailablePercent = totalEquipmentCount > 0 ? Math.round((availableEquipmentCount / totalEquipmentCount) * 100) : 0
+
   const stats = [
-    { name: 'Aktywne rezerwacje', value: String(activeReservationsCount), change: '+0%', icon: 'Calendar', color: 'text-primary' },
-    { name: 'Uzytkownicy', value: `${usersRows.length}/${usersLimit}`, change: '+0%', icon: 'Users', color: 'text-accent' },
-    { name: 'Dostepne biurka', value: `${availableDesksCount}/${desksCount || 1}`, change: '0%', icon: 'Monitor', color: 'text-chart-3' },
-    { name: 'Dostepny sprzet', value: `${availableEquipmentCount}/${totalEquipmentCount || 1}`, change: '0%', icon: 'Package', color: 'text-chart-5' },
+    { name: 'Aktywne rezerwacje', value: String(activeReservationsCount), change: reservationsChange, icon: 'Calendar', color: 'text-primary' },
+    { name: 'Uzytkownicy', value: `${usersRows.length}/${usersLimit}`, change: `${userCapacityPercent}% limitu`, icon: 'Users', color: 'text-accent' },
+    { name: 'Dostepne biurka', value: `${availableDesksCount}/${desksCount}`, change: `${desksAvailablePercent}% wolne`, icon: 'Monitor', color: 'text-chart-3' },
+    { name: 'Dostepny sprzet', value: `${availableEquipmentCount}/${totalEquipmentCount}`, change: `${equipmentAvailablePercent}% wolne`, icon: 'Package', color: 'text-chart-5' },
   ]
 
   const weekdays = ['Pon', 'Wt', 'Sr', 'Czw', 'Pt']
@@ -117,10 +140,22 @@ export async function GET() {
     sprzet: Math.max(0, borrowedEquipmentCount - index),
   }))
 
-  const monthlyData = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze'].map((name, index) => ({
-    name,
-    rezerwacje: reservationRows.length + index * 5,
-  }))
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const reservationsThisMonth = reservationRows.filter(
+    (row) => row.createdAt >= monthStart && row.createdAt < tomorrow
+  )
+
+  const monthlyData = Array.from({ length: now.getDate() }, (_, index) => {
+    const day = index + 1
+    const dayEnd = new Date(now.getFullYear(), now.getMonth(), day + 1)
+    const cumulativeCount = reservationsThisMonth.filter((row) => row.createdAt < dayEnd).length
+
+    return {
+      name: String(day),
+      rezerwacje: cumulativeCount,
+    }
+  })
 
   const equipmentWorkflowByResource = new Map<
     string,

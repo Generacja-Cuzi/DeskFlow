@@ -1,8 +1,8 @@
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, gte, inArray, lt } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { companies, reservations, subscriptionPackages, users } from '@/lib/db/schema'
+import { companies, reservations, subscriptionPackages, userCompanyMemberships } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 
 export async function GET() {
@@ -12,10 +12,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const [allCompanies, allUsers, allReservations] = await Promise.all([
+  const [allCompanies, allReservations, membershipRows] = await Promise.all([
     db.select({ value: count() }).from(companies),
-    db.select({ value: count() }).from(users),
     db.select({ value: count() }).from(reservations),
+    db.query.userCompanyMemberships.findMany(),
   ])
 
   const activeCompanies = await db.select({ value: count() }).from(companies).where(eq(companies.status, 'active'))
@@ -26,16 +26,29 @@ export async function GET() {
   const priceByPlan = new Map(packages.map((pkg) => [pkg.id, pkg.price]))
   const computedMrr = activeOrTrialCompanies.reduce((sum, company) => sum + (priceByPlan.get(company.plan) || 0), 0)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const usersByCompanyId = new Map<string, number>()
+  const uniqueUserIds = new Set<string>()
+
+  for (const membership of membershipRows) {
+    usersByCompanyId.set(membership.companyId, (usersByCompanyId.get(membership.companyId) || 0) + 1)
+    uniqueUserIds.add(membership.userId)
+  }
+
+  const now = new Date()
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   const todaysReservations = await db
     .select({ value: count() })
     .from(reservations)
-    .where(and(eq(reservations.status, 'active'), eq(reservations.date, today)))
+    .where(
+      and(
+        gte(reservations.startAt, dayStart),
+        lt(reservations.startAt, dayEnd),
+        inArray(reservations.status, ['pending', 'approved', 'issued', 'active', 'upcoming'])
+      )
+    )
 
-  const recent = await db.query.companies.findMany({
-    with: { users: true },
-    limit: 6,
-  })
+  const recent = await db.query.companies.findMany({ limit: 6 })
 
   return NextResponse.json({
     stats: [
@@ -46,7 +59,7 @@ export async function GET() {
       },
       {
         name: 'Laczna liczba uzytkownikow',
-        value: String(allUsers[0]?.value || 0),
+        value: String(uniqueUserIds.size),
         change: 'Dane na zywo',
       },
       {
@@ -63,7 +76,7 @@ export async function GET() {
     recentCompanies: recent.map((company) => ({
       id: company.id,
       name: company.name,
-      users: company.users.length,
+      users: usersByCompanyId.get(company.id) || 0,
       plan: company.plan,
       status: company.status,
       joinedAt: company.createdAt.toISOString().slice(0, 10),

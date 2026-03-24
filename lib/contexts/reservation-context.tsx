@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react"
 import { FloorPlan, Desk, ConferenceRoom, ReservationContextType, ReservationFilters, FloorPlanViewState, DeskReservationRequest, RoomReservationRequest } from "@/lib/types"
+import { toast } from "@/hooks/use-toast"
 
 const ReservationContext = createContext<ReservationContextType | null>(null)
 
@@ -77,6 +78,17 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       })
 
       if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const description =
+          typeof payload?.error === "string"
+            ? payload.error
+            : "Nie udalo sie zarezerwowac biurka w wybranym przedziale czasu."
+
+        toast({
+          title: "Rezerwacja odrzucona",
+          description,
+          variant: "destructive",
+        })
         return false
       }
 
@@ -98,6 +110,17 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       })
 
       if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const description =
+          typeof payload?.error === "string"
+            ? payload.error
+            : "Nie udalo sie zarezerwowac sali w wybranym przedziale czasu."
+
+        toast({
+          title: "Rezerwacja odrzucona",
+          description,
+          variant: "destructive",
+        })
         return false
       }
 

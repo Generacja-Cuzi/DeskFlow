@@ -95,7 +95,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(_: Request, context: { params: Promise<{ userId: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ userId: string }> }) {
   const actor = await getActor()
 
   if (!actor.user || actor.user.role !== 'superadmin') {
@@ -103,6 +103,35 @@ export async function DELETE(_: Request, context: { params: Promise<{ userId: st
   }
 
   const { userId } = await context.params
+  const url = new URL(request.url)
+  const scope = url.searchParams.get('scope') === 'company' ? 'company' : 'application'
+  const companyId = url.searchParams.get('companyId')?.trim() || ''
+
+  if (scope === 'company') {
+    if (!companyId) {
+      return NextResponse.json({ error: 'Missing companyId for company scope' }, { status: 400 })
+    }
+
+    await db
+      .delete(userCompanyMemberships)
+      .where(and(eq(userCompanyMemberships.userId, userId), eq(userCompanyMemberships.companyId, companyId)))
+
+    const remainingMembership = await db.query.userCompanyMemberships.findFirst({
+      where: eq(userCompanyMemberships.userId, userId),
+    })
+
+    const targetUser = await db.query.users.findFirst({ where: eq(users.id, userId) })
+    if (targetUser) {
+      await db
+        .update(users)
+        .set({
+          companyId: remainingMembership?.companyId || null,
+        })
+        .where(eq(users.id, userId))
+    }
+
+    return NextResponse.json({ ok: true, removedFromCompany: true })
+  }
 
   if (actor.user.id === userId) {
     return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })

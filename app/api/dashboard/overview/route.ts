@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { floorElements, reservations, resources, userCompanyMemberships } from '@/lib/db/schema'
+import { companies, floorElements, reservations, resources, subscriptionPackages, userCompanyMemberships } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
 
@@ -37,7 +37,7 @@ export async function GET() {
     return NextResponse.json({ error: 'No company assigned' }, { status: 403 })
   }
 
-  const [membershipsRows, resourcesRows, reservationRows, desksRows] = await Promise.all([
+  const [membershipsRows, resourcesRows, reservationRows, desksRows, companyRow] = await Promise.all([
     db.query.userCompanyMemberships.findMany({ where: eq(userCompanyMemberships.companyId, companyId) }),
     db.query.resources.findMany({ where: eq(resources.companyId, companyId) }),
     db.query.reservations.findMany({ where: eq(reservations.companyId, companyId) }),
@@ -47,7 +47,12 @@ export async function GET() {
         floor: true,
       },
     }),
+    db.query.companies.findFirst({ where: eq(companies.id, companyId) }),
   ])
+
+  const packageRow = companyRow
+    ? await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, companyRow.plan) })
+    : null
 
   const companyDeskRows = desksRows.filter((desk) => desk.floor.companyId === companyId)
   const { start: windowStart, end: windowEnd } = getCurrentHalfHourWindow()
@@ -64,14 +69,20 @@ export async function GET() {
   const activeReservationsCount = reservationRows.filter((r) => r.status === 'active' || r.status === 'upcoming').length
   const availableDesksCount = companyDeskRows.filter((desk) => !occupiedDeskIds.has(desk.id)).length
   const desksCount = companyDeskRows.length
+  const availableEquipmentCount = resourcesRows.filter((r) => r.status === 'available').length
+  const usersLimit = packageRow?.maxUsers ?? membershipsRows.length
+  const totalEquipmentCount = resourcesRows.length
   const borrowedEquipmentCount = resourcesRows.filter((r) => r.status === 'borrowed').length
 
   return NextResponse.json({
     stats: {
       activeReservations: activeReservationsCount,
       users: membershipsRows.length,
+      usersLimit,
       availableDesks: availableDesksCount,
       totalDesks: desksCount,
+      availableEquipment: availableEquipmentCount,
+      totalEquipment: totalEquipmentCount,
       borrowedEquipment: borrowedEquipmentCount,
     },
   })

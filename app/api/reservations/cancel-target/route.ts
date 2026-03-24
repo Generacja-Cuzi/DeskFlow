@@ -37,6 +37,8 @@ export async function POST(request: Request) {
           name: reservation.user?.name,
         },
         reservationLabel: reservation.name,
+        companyId,
+        userId: reservation.userId || undefined,
       })
 
       if (reservation.userId) {

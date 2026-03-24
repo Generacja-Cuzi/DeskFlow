@@ -101,7 +101,12 @@ export default function SuperadminUsersPage() {
   }
 
   const handleDeleteUser = async (userId: string) => {
-    const response = await fetch(`/api/superadmin/users/${userId}`, {
+    const query =
+      activeTab === "company"
+        ? `?scope=company&companyId=${encodeURIComponent(selectedCompanyId)}`
+        : "?scope=application"
+
+    const response = await fetch(`/api/superadmin/users/${userId}${query}`, {
       method: "DELETE",
     })
 

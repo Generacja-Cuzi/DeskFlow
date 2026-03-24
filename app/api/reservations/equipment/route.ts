@@ -2,9 +2,10 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { reservations, resources } from '@/lib/db/schema'
+import { reservations, resources, users } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { sendNewRequestToAdminEmail } from '@/lib/server/notification-emails'
 import { createNotification, createNotificationsForUsers, getAdminUserIds } from '@/lib/server/notifications'
 
 const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
@@ -103,6 +104,9 @@ export async function POST(request: Request) {
     })
 
   const adminIds = await getAdminUserIds(companyId)
+  const admins = adminIds.length
+    ? await db.query.users.findMany({ where: inArray(users.id, adminIds) })
+    : []
 
   await Promise.allSettled([
     createNotification({
@@ -119,6 +123,18 @@ export async function POST(request: Request) {
       title: 'Nowy wniosek o wypozyczenie',
       message: `${actor.user.name || 'Uzytkownik'} zlozyl(a) wniosek o ${resource.name}.`,
     }),
+    ...admins.map((admin) =>
+      sendNewRequestToAdminEmail({
+        recipient: {
+          email: admin.email,
+          name: admin.name,
+        },
+        requesterName: actor.user?.name || 'Uzytkownik',
+        resourceName: resource.name,
+        companyId,
+        userId: admin.id,
+      })
+    ),
   ])
 
   return NextResponse.json({ ok: true })

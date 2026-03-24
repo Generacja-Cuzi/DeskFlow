@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { useBranding } from "@/lib/contexts/branding-context"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
 
 export default function CompanySettingsPage() {
   const { branding, updateBranding } = useBranding()
@@ -30,11 +31,17 @@ export default function CompanySettingsPage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [isNotificationsDialogOpen, setIsNotificationsDialogOpen] = useState(false)
   const [notificationSettings, setNotificationSettings] = useState({
+    inAppEnabled: true,
     emailEnabled: true,
-    reservationAlerts: true,
-    requestAlerts: true,
-    dailySummary: false,
+    inAppReservationAlerts: true,
+    inAppRequestAlerts: true,
+    emailReservationAlerts: true,
+    emailRequestAlerts: true,
+    inAppDailySummary: false,
+    emailDailySummary: false,
+    lockUserPreferences: false,
   })
+  const [notificationsSaving, setNotificationsSaving] = useState(false)
   
   // Local state for form
   const [formData, setFormData] = useState({
@@ -65,16 +72,21 @@ export default function CompanySettingsPage() {
     })
   }, [branding])
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem("company-notification-settings")
-    if (!raw) return
-
-    try {
-      const parsed = JSON.parse(raw)
-      setNotificationSettings((prev) => ({ ...prev, ...parsed }))
-    } catch {
-      // Ignore malformed local settings.
+  const loadNotificationSettings = async () => {
+    const response = await fetch('/api/admin/notifications/settings', { cache: 'no-store' })
+    if (!response.ok) {
+      return
     }
+
+    const data = await response.json()
+    setNotificationSettings((prev) => ({
+      ...prev,
+      ...(data.settings || {}),
+    }))
+  }
+
+  useEffect(() => {
+    loadNotificationSettings()
   }, [])
 
   const handleSave = async () => {
@@ -139,10 +151,29 @@ export default function CompanySettingsPage() {
     setSaveMessage("Eksport danych zostal pobrany.")
   }
 
-  const handleSaveNotifications = () => {
-    window.localStorage.setItem("company-notification-settings", JSON.stringify(notificationSettings))
+  const handleSaveNotifications = async () => {
+    setNotificationsSaving(true)
+
+    const response = await fetch('/api/admin/notifications/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notificationSettings),
+    })
+
+    if (!response.ok) {
+      setSaveMessage("Nie udalo sie zapisac ustawien powiadomien.")
+      setNotificationsSaving(false)
+      return
+    }
+
+    const data = await response.json()
+    setNotificationSettings((prev) => ({
+      ...prev,
+      ...(data.settings || {}),
+    }))
     setIsNotificationsDialogOpen(false)
     setSaveMessage("Zapisano ustawienia powiadomien.")
+    setNotificationsSaving(false)
   }
 
   const handleResetBranding = async () => {
@@ -514,54 +545,153 @@ export default function CompanySettingsPage() {
           <DialogHeader>
             <DialogTitle>Ustawienia powiadomien</DialogTitle>
             <DialogDescription>
-              Ustal globalne powiadomienia dla firmy.
+              Te ustawienia sa domyslne dla nowych uzytkownikow firmy.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="font-medium">Powiadomienia email</p>
-                <p className="text-sm text-muted-foreground">Wysylaj powiadomienia na skrzynki firmowe</p>
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Powiadomienia email</p>
+                  <p className="text-sm text-muted-foreground">Domyslne powiadomienia email dla firmy</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.emailEnabled}
+                  disabled={notificationsSaving}
+                  onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, emailEnabled: checked }))}
+                />
               </div>
-              <Switch
-                checked={notificationSettings.emailEnabled}
-                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, emailEnabled: checked }))}
-              />
+
+              {notificationSettings.emailEnabled && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Alerty o rezerwacjach</p>
+                      <p className="text-sm text-muted-foreground">Potwierdzenia i anulacje rezerwacji</p>
+                    </div>
+                    <Switch
+                      checked={notificationSettings.emailReservationAlerts}
+                      disabled={notificationsSaving}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings((prev) => ({ ...prev, emailReservationAlerts: checked }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Alerty o wnioskach</p>
+                      <p className="text-sm text-muted-foreground">Decyzje i nowe wnioski wymagajace akceptacji</p>
+                    </div>
+                    <Switch
+                      checked={notificationSettings.emailRequestAlerts}
+                      disabled={notificationsSaving}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings((prev) => ({ ...prev, emailRequestAlerts: checked }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Codzienne podsumowanie</p>
+                      <p className="text-sm text-muted-foreground">Domyslnie wlaczone dla adminow (email)</p>
+                    </div>
+                    <Switch
+                      checked={notificationSettings.emailDailySummary}
+                      disabled={notificationsSaving}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings((prev) => ({ ...prev, emailDailySummary: checked }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="font-medium">Alerty o rezerwacjach</p>
-                <p className="text-sm text-muted-foreground">Nowe i anulowane rezerwacje biurek/sal</p>
+
+            <Separator />
+
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Powiadomienia w aplikacji</p>
+                  <p className="text-sm text-muted-foreground">Domyslne powiadomienia in-app dla firmy</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.inAppEnabled}
+                  disabled={notificationsSaving}
+                  onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, inAppEnabled: checked }))}
+                />
               </div>
-              <Switch
-                checked={notificationSettings.reservationAlerts}
-                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, reservationAlerts: checked }))}
-              />
+
+              {notificationSettings.inAppEnabled && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Alerty o rezerwacjach</p>
+                      <p className="text-sm text-muted-foreground">Potwierdzenia i anulacje rezerwacji</p>
+                    </div>
+                    <Switch
+                      checked={notificationSettings.inAppReservationAlerts}
+                      disabled={notificationsSaving}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings((prev) => ({ ...prev, inAppReservationAlerts: checked }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Alerty o wnioskach</p>
+                      <p className="text-sm text-muted-foreground">Decyzje i nowe wnioski wymagajace akceptacji</p>
+                    </div>
+                    <Switch
+                      checked={notificationSettings.inAppRequestAlerts}
+                      disabled={notificationsSaving}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings((prev) => ({ ...prev, inAppRequestAlerts: checked }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Codzienne podsumowanie</p>
+                      <p className="text-sm text-muted-foreground">Domyslnie wlaczone dla adminow (in-app)</p>
+                    </div>
+                    <Switch
+                      checked={notificationSettings.inAppDailySummary}
+                      disabled={notificationsSaving}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings((prev) => ({ ...prev, inAppDailySummary: checked }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="font-medium">Alerty o wnioskach</p>
-                <p className="text-sm text-muted-foreground">Nowe wnioski o wypozyczenie sprzetu</p>
+
+            <Separator />
+
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Blokada ustawien dla uzytkownikow</p>
+                  <p className="text-sm text-muted-foreground">
+                    Po wlaczeniu tylko admin moze zmieniac ustawienia. Ustawienia wszystkich zostana nadpisane.
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.lockUserPreferences}
+                  disabled={notificationsSaving}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings((prev) => ({ ...prev, lockUserPreferences: checked }))
+                  }
+                />
               </div>
-              <Switch
-                checked={notificationSettings.requestAlerts}
-                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, requestAlerts: checked }))}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="font-medium">Codzienne podsumowanie</p>
-                <p className="text-sm text-muted-foreground">Podsumowanie zajetosci i wypozyczen</p>
-              </div>
-              <Switch
-                checked={notificationSettings.dailySummary}
-                onCheckedChange={(checked) => setNotificationSettings((prev) => ({ ...prev, dailySummary: checked }))}
-              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsNotificationsDialogOpen(false)}>Anuluj</Button>
-            <Button onClick={handleSaveNotifications}>Zapisz</Button>
+            <Button onClick={() => void handleSaveNotifications()} disabled={notificationsSaving}>
+              {notificationsSaving ? 'Zapisywanie...' : 'Zapisz'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

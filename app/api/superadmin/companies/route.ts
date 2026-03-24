@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db/client'
-import { companies, companyBranding, subscriptionPackages, users } from '@/lib/db/schema'
+import { companies, companyBranding, subscriptionPackages, userCompanyMemberships, users } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 
 export async function GET() {
@@ -12,12 +12,19 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const rows = await db.query.companies.findMany({
-    with: {
-      users: true,
-      branding: true,
-    },
-  })
+  const [rows, membershipRows] = await Promise.all([
+    db.query.companies.findMany({
+      with: {
+        branding: true,
+      },
+    }),
+    db.query.userCompanyMemberships.findMany(),
+  ])
+
+  const usersByCompanyId = new Map<string, number>()
+  for (const membership of membershipRows) {
+    usersByCompanyId.set(membership.companyId, (usersByCompanyId.get(membership.companyId) || 0) + 1)
+  }
 
   const packages = await db.query.subscriptionPackages.findMany()
   const packageById = new Map(packages.map((pkg) => [pkg.id, pkg]))
@@ -27,7 +34,7 @@ export async function GET() {
       id: company.id,
       name: company.name,
       slug: company.slug,
-      users: company.users.length,
+      users: usersByCompanyId.get(company.id) || 0,
       plan: company.plan,
       maxUsers: packageById.get(company.plan)?.maxUsers || 0,
       status: company.status,

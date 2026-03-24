@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useReservation } from "@/lib/contexts/reservation-context"
 import type { FloorElement } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 type BusySlot = {
   startAt: string
@@ -156,6 +157,7 @@ function getFreeIntervals(busySlots: BusySlot[]) {
 }
 
 export default function BiurkaPage() {
+  const { toast } = useToast()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [startTime, setStartTime] = useState("09:00")
   const [endTime, setEndTime] = useState("17:00")
@@ -252,6 +254,11 @@ export default function BiurkaPage() {
 
   const reserveDesk = async (deskId: string, rangeStart = startTime, rangeEnd = endTime) => {
     if (toMinutes(rangeEnd) <= toMinutes(rangeStart)) {
+      toast({
+        title: "Nieprawidlowy zakres godzin",
+        description: "Godzina konca musi byc pozniejsza niz godzina startu.",
+        variant: "destructive",
+      })
       return
     }
 
@@ -270,10 +277,27 @@ export default function BiurkaPage() {
 
     setSubmittingDeskId(null)
 
-    if (response.ok) {
-      setDialogOpen(false)
-      await loadAvailability()
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      const description =
+        typeof payload?.error === "string"
+          ? payload.error
+          : "Nie udalo sie zarezerwowac biurka w wybranym przedziale czasu."
+
+      toast({
+        title: "Rezerwacja odrzucona",
+        description,
+        variant: "destructive",
+      })
+      return
     }
+
+    setDialogOpen(false)
+    await loadAvailability()
+    toast({
+      title: "Rezerwacja zapisana",
+      description: "Biurko zostalo zarezerwowane.",
+    })
   }
 
   const freeIntervals = useMemo(() => {
@@ -555,9 +579,6 @@ export default function BiurkaPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Zamknij
-            </Button>
             <Button
               disabled={
                 !reservationDraft ||

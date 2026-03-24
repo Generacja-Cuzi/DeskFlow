@@ -65,6 +65,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ reque
       },
       reservationLabel: reservation.name,
       decision: 'approved',
+      companyId,
+      userId: reservation.userId || undefined,
     })
 
     if (reservation.userId) {
@@ -95,6 +97,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ reque
     },
     reservationLabel: reservation.name,
     decision: 'rejected',
+    companyId,
+    userId: reservation.userId || undefined,
   })
 
   if (reservation.userId) {

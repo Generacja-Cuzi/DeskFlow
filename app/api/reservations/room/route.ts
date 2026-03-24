@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { floorElements, reservations } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
+import { sendReservationConfirmedEmail } from '@/lib/server/notification-emails'
 import { createNotification } from '@/lib/server/notifications'
 
 const blockingStatuses = ['pending', 'approved', 'issued', 'active', 'upcoming'] as const
@@ -131,6 +132,16 @@ export async function POST(request: Request) {
     type: 'reservation',
     title: 'Rezerwacja sali potwierdzona',
     message: `Sala ${room.name} zostala zarezerwowana na ${date} (${timeSlot}).`,
+  })
+
+  await sendReservationConfirmedEmail({
+    recipient: {
+      email: actor.user.email,
+      name: actor.user.name,
+    },
+    reservationLabel: `Sala ${room.name}, ${date}, ${timeSlot}`,
+    companyId,
+    userId: actor.user.id,
   })
 
   return NextResponse.json({ ok: true })

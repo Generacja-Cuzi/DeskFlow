@@ -159,6 +159,8 @@ export async function POST(request: Request) {
         itemType: item.itemType,
         itemName: item.itemName,
         floorName: item.floorName,
+        companyId,
+        userId: item.userId,
       })
     )
   )

@@ -35,6 +35,7 @@ import {
 } from "lucide-react"
 import { FloorElement, InteractiveFloorPlanProps, DeskReservationRequest, RoomReservationRequest } from "@/lib/types"
 import { useReservation, useCurrentFloorPlan, useFilteredElements } from "@/lib/contexts/reservation-context"
+import { toast } from "@/hooks/use-toast"
 
 interface ReservationDialogProps {
   element: FloorElement | null
@@ -54,6 +55,8 @@ function ReservationDialog({ element, isOpen, onClose, onReserve }: ReservationD
 
     setIsSubmitting(true)
     try {
+      let success = false
+
       if (element.type === "desk") {
         const request: DeskReservationRequest = {
           deskId: element.id,
@@ -63,7 +66,7 @@ function ReservationDialog({ element, isOpen, onClose, onReserve }: ReservationD
           endTime: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours
           date: new Date().toISOString().split("T")[0],
         }
-        await onReserve(request)
+        success = await onReserve(request)
       } else if (element.type === "room" && selectedTimeSlot) {
         const request: RoomReservationRequest = {
           roomId: element.id,
@@ -74,8 +77,18 @@ function ReservationDialog({ element, isOpen, onClose, onReserve }: ReservationD
           timeSlot: selectedTimeSlot,
           date: new Date().toISOString().split("T")[0],
         }
-        await onReserve(request)
+        success = await onReserve(request)
       }
+
+      if (!success) {
+        toast({
+          title: "Rezerwacja odrzucona",
+          description: "Sprawdz dostepnosc i wybierz inny przedzial czasu.",
+          variant: "destructive",
+        })
+        return
+      }
+
       onClose()
       setMeetingTitle("")
       setSelectedTimeSlot("")

@@ -5,7 +5,12 @@ import { db } from '@/lib/db/client'
 import { notifications } from '@/lib/db/schema'
 import { getActor } from '@/lib/server/auth'
 import { getActiveCompanyId } from '@/lib/server/company'
-import { deleteNotificationsForUser, markAllNotificationsRead, markNotificationRead } from '@/lib/server/notifications'
+import {
+  deleteNotificationsForUser,
+  getNotificationPreferences,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '@/lib/server/notifications'
 
 export async function GET() {
   const companyId = await getActiveCompanyId()
@@ -17,6 +22,11 @@ export async function GET() {
 
   if (!actor.user?.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const preferences = await getNotificationPreferences(actor.user.id, companyId)
+  if (!preferences.inAppEnabled) {
+    return NextResponse.json({ notifications: [], unreadCount: 0 })
   }
 
   const rows = await db.query.notifications.findMany({

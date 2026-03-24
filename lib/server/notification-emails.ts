@@ -1,4 +1,5 @@
 import { sendMail } from '@/lib/server/mailer'
+import { canSendEmailNotification } from '@/lib/server/notifications'
 
 type Recipient = {
   email: string | null | undefined
@@ -10,13 +11,35 @@ function withGreeting(recipient: Recipient, body: string) {
   return `Czesc ${name},\n\n${body}\n\nPozdrawiamy,\nDeskFlow`
 }
 
+async function canDeliverEmail(input: {
+  companyId?: string
+  userId?: string
+  type: 'reservation' | 'equipment' | 'reminder' | 'approval' | 'rejection' | 'info'
+}) {
+  if (!input.companyId || !input.userId) {
+    return true
+  }
+
+  return canSendEmailNotification({
+    companyId: input.companyId,
+    userId: input.userId,
+    type: input.type,
+  })
+}
+
 export async function sendResourceChangedEmail(input: {
   recipient: Recipient
   resourceName: string
   changedBy: string
   changeDescription: string
+  companyId?: string
+  userId?: string
 }) {
   if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'equipment' }))) {
     return
   }
 
@@ -36,8 +59,14 @@ export async function sendReservationCancelledEmail(input: {
   recipient: Recipient
   reservationLabel: string
   reason?: string
+  companyId?: string
+  userId?: string
 }) {
   if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'reservation' }))) {
     return
   }
 
@@ -51,12 +80,47 @@ export async function sendReservationCancelledEmail(input: {
   await sendMail({ to: input.recipient.email, subject, text })
 }
 
+export async function sendReservationConfirmedEmail(input: {
+  recipient: Recipient
+  reservationLabel: string
+  companyId?: string
+  userId?: string
+}) {
+  if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'reservation' }))) {
+    return
+  }
+
+  const subject = `Potwierdzenie rezerwacji: ${input.reservationLabel}`
+  const text = withGreeting(
+    input.recipient,
+    [`Twoja rezerwacja zostala potwierdzona.`, `Szczegoly: ${input.reservationLabel}`].join('\n')
+  )
+
+  await sendMail({ to: input.recipient.email, subject, text })
+}
+
 export async function sendReservationDecisionEmail(input: {
   recipient: Recipient
   reservationLabel: string
   decision: 'approved' | 'rejected'
+  companyId?: string
+  userId?: string
 }) {
   if (!input.recipient.email) {
+    return
+  }
+
+  if (
+    !(await canDeliverEmail({
+      companyId: input.companyId,
+      userId: input.userId,
+      type: input.decision === 'approved' ? 'approval' : 'rejection',
+    }))
+  ) {
     return
   }
 
@@ -82,8 +146,14 @@ export async function sendDeskOrRoomRemovedEmail(input: {
   itemType: 'desk' | 'room'
   itemName: string
   floorName?: string | null
+  companyId?: string
+  userId?: string
 }) {
   if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'reservation' }))) {
     return
   }
 
@@ -102,8 +172,14 @@ export async function sendOverdueEquipmentEmail(input: {
   recipient: Recipient
   resourceName: string
   dueAt: Date
+  companyId?: string
+  userId?: string
 }) {
   if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'reminder' }))) {
     return
   }
 
@@ -125,8 +201,14 @@ export async function sendResourceIssuedEmail(input: {
   recipient: Recipient
   resourceName: string
   endAt: Date
+  companyId?: string
+  userId?: string
 }) {
   if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'equipment' }))) {
     return
   }
 
@@ -143,8 +225,14 @@ export async function sendResourceIssuedEmail(input: {
 export async function sendResourceReturnedEmail(input: {
   recipient: Recipient
   resourceName: string
+  companyId?: string
+  userId?: string
 }) {
   if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'equipment' }))) {
     return
   }
 
@@ -152,6 +240,33 @@ export async function sendResourceReturnedEmail(input: {
   const text = withGreeting(
     input.recipient,
     `Administrator zamknal wypozyczenie zasobu ${input.resourceName} i oznaczyl go jako zwrocony.`
+  )
+
+  await sendMail({ to: input.recipient.email, subject, text })
+}
+
+export async function sendNewRequestToAdminEmail(input: {
+  recipient: Recipient
+  requesterName: string
+  resourceName: string
+  companyId?: string
+  userId?: string
+}) {
+  if (!input.recipient.email) {
+    return
+  }
+
+  if (!(await canDeliverEmail({ companyId: input.companyId, userId: input.userId, type: 'approval' }))) {
+    return
+  }
+
+  const subject = `Nowy wniosek do akceptacji: ${input.resourceName}`
+  const text = withGreeting(
+    input.recipient,
+    [
+      `${input.requesterName} zlozyl(a) nowy wniosek o wypozyczenie ${input.resourceName}.`,
+      'Wejdz do panelu admina i podejmij decyzje.',
+    ].join('\n')
   )
 
   await sendMail({ to: input.recipient.email, subject, text })

@@ -187,12 +187,59 @@ export const notifications = pgTable('notifications', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const companyNotificationSettings = pgTable('company_notification_settings', {
+  companyId: text('company_id').primaryKey().references(() => companies.id, { onDelete: 'cascade' }),
+  inAppEnabled: boolean('in_app_enabled').notNull().default(true),
+  emailEnabled: boolean('email_enabled').notNull().default(true),
+  inAppReservationAlerts: boolean('in_app_reservation_alerts').notNull().default(true),
+  inAppRequestAlerts: boolean('in_app_request_alerts').notNull().default(true),
+  emailReservationAlerts: boolean('email_reservation_alerts').notNull().default(true),
+  emailRequestAlerts: boolean('email_request_alerts').notNull().default(true),
+  inAppDailySummary: boolean('in_app_daily_summary').notNull().default(false),
+  emailDailySummary: boolean('email_daily_summary').notNull().default(false),
+  lockUserPreferences: boolean('lock_user_preferences').notNull().default(false),
+  reservationAlerts: boolean('reservation_alerts').notNull().default(true),
+  requestAlerts: boolean('request_alerts').notNull().default(true),
+  dailySummary: boolean('daily_summary').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const userNotificationPreferences = pgTable(
+  'user_notification_preferences',
+  {
+    id: text('id').primaryKey(),
+    companyId: text('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    inAppEnabled: boolean('in_app_enabled').notNull().default(true),
+    emailEnabled: boolean('email_enabled').notNull().default(true),
+    inAppReservationAlerts: boolean('in_app_reservation_alerts').notNull().default(true),
+    inAppRequestAlerts: boolean('in_app_request_alerts').notNull().default(true),
+    emailReservationAlerts: boolean('email_reservation_alerts').notNull().default(true),
+    emailRequestAlerts: boolean('email_request_alerts').notNull().default(true),
+    inAppDailySummary: boolean('in_app_daily_summary').notNull().default(false),
+    emailDailySummary: boolean('email_daily_summary').notNull().default(false),
+    dailySummary: boolean('daily_summary').notNull().default(false),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userCompanyUnique: uniqueIndex('user_notification_preferences_user_company_unique').on(
+      table.userId,
+      table.companyId
+    ),
+  })
+)
+
 export const companiesRelations = relations(companies, ({ many, one }) => ({
   users: many(users),
   memberships: many(userCompanyMemberships),
   floors: many(floors),
   resources: many(resources),
   reservations: many(reservations),
+  notificationPreferences: many(userNotificationPreferences),
+  notificationSettings: one(companyNotificationSettings, {
+    fields: [companies.id],
+    references: [companyNotificationSettings.companyId],
+  }),
   branding: one(companyBranding, {
     fields: [companies.id],
     references: [companyBranding.companyId],
@@ -229,6 +276,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   memberships: many(userCompanyMemberships),
   reservations: many(reservations),
   notifications: many(notifications),
+  notificationPreferences: many(userNotificationPreferences),
 }))
 
 export const userCompanyMembershipsRelations = relations(userCompanyMemberships, ({ one }) => ({
@@ -272,6 +320,24 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
   user: one(users, {
     fields: [notifications.userId],
+    references: [users.id],
+  }),
+}))
+
+export const companyNotificationSettingsRelations = relations(companyNotificationSettings, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyNotificationSettings.companyId],
+    references: [companies.id],
+  }),
+}))
+
+export const userNotificationPreferencesRelations = relations(userNotificationPreferences, ({ one }) => ({
+  company: one(companies, {
+    fields: [userNotificationPreferences.companyId],
+    references: [companies.id],
+  }),
+  user: one(users, {
+    fields: [userNotificationPreferences.userId],
     references: [users.id],
   }),
 }))

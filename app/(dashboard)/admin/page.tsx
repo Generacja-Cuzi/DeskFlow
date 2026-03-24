@@ -170,6 +170,13 @@ const statIconByName: Record<string, any> = {
   "Dostepny sprzet": Package,
 }
 
+const statIconByKey: Record<string, any> = {
+  Calendar,
+  Users,
+  Monitor,
+  Package,
+}
+
 const statStyleByName: Record<string, { icon: string; bg: string }> = {
   "Aktywne rezerwacje": { icon: "text-blue-500", bg: "bg-blue-500/10" },
   Uzytkownicy: { icon: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -568,7 +575,8 @@ export default function AdminPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 {(() => {
-                  const Icon = (stat as any).icon || statIconByName[stat.name] || Calendar
+                  const iconFromApi = typeof (stat as any).icon === "string" ? statIconByKey[(stat as any).icon] : (stat as any).icon
+                  const Icon = iconFromApi || statIconByName[stat.name] || Calendar
                   const iconStyle = statStyleByName[stat.name] || { icon: "text-muted-foreground", bg: "bg-muted" }
                   return (
                     <div className={`p-3 rounded-lg ${iconStyle.bg}`}>
@@ -623,7 +631,7 @@ export default function AdminPage() {
         <Card>
           <CardHeader>
             <CardTitle>Trend rezerwacji</CardTitle>
-            <CardDescription>Miesieczna liczba rezerwacji</CardDescription>
+            <CardDescription>Narastajaco w biezacym miesiacu (KPI)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">

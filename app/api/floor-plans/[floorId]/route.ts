@@ -75,6 +75,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ floorId: s
             itemType: removedElement.type,
             itemName: removedElement.name,
             floorName: floor.name,
+            companyId,
+            userId: reservation.userId || undefined,
           })
         })
       )

@@ -76,9 +76,20 @@ export default function PowiadomieniaPage() {
   const [notificationsList, setNotificationsList] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [requestError, setRequestError] = useState<string | null>(null)
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [pushNotifications, setPushNotifications] = useState(true)
-  const [reminderNotifications, setReminderNotifications] = useState(true)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settings, setSettings] = useState({
+    inAppEnabled: true,
+    emailEnabled: true,
+    inAppReservationAlerts: true,
+    inAppRequestAlerts: true,
+    emailReservationAlerts: true,
+    emailRequestAlerts: true,
+    inAppDailySummary: false,
+    emailDailySummary: false,
+    dailySummary: false,
+  })
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [lockedByAdmin, setLockedByAdmin] = useState(false)
 
   const unreadCount = notificationsList.filter(n => !n.read).length
 
@@ -100,8 +111,78 @@ export default function PowiadomieniaPage() {
     }
   }
 
+  const loadPreferences = async () => {
+    const response = await fetch('/api/notifications/preferences', { cache: 'no-store' })
+
+    if (!response.ok) {
+      return
+    }
+
+    const data = await response.json()
+
+    setSettings((prev) => ({
+      ...prev,
+      ...(data.preferences || {}),
+    }))
+    setIsAdmin(Boolean(data.isAdmin))
+    setLockedByAdmin(Boolean(data.lockedByAdmin))
+  }
+
+  const updatePreference = async (patch: Partial<typeof settings>) => {
+    if (lockedByAdmin && !isAdmin) {
+      setRequestError('Administrator zablokowal edycje ustawien powiadomien dla uzytkownikow.')
+      return
+    }
+
+    setSettingsSaving(true)
+
+    const next = { ...settings, ...patch }
+    if (!isAdmin) {
+      next.inAppDailySummary = false
+      next.emailDailySummary = false
+      next.dailySummary = false
+    } else {
+      next.dailySummary = Boolean(next.inAppDailySummary || next.emailDailySummary)
+    }
+
+    setSettings(next)
+
+    try {
+      const response = await fetch('/api/notifications/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+
+      if (!response.ok) {
+        setRequestError('Nie udalo sie zapisac ustawien powiadomien.')
+        await loadPreferences()
+        setSettingsSaving(false)
+        return
+      }
+
+      const data = await response.json()
+      setSettings((prev) => {
+        const merged = { ...prev, ...(data.preferences || {}) }
+        return {
+          ...merged,
+          dailySummary: Boolean(merged.inAppDailySummary || merged.emailDailySummary),
+        }
+      })
+      setIsAdmin(Boolean(data.isAdmin))
+      setLockedByAdmin(Boolean(data.lockedByAdmin))
+      setRequestError(null)
+    } catch {
+      setRequestError('Nie udalo sie zapisac ustawien powiadomien.')
+      await loadPreferences()
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
   useEffect(() => {
     loadNotifications()
+    loadPreferences()
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState !== "visible") {
@@ -153,6 +234,11 @@ export default function PowiadomieniaPage() {
             Zarzadzaj swoimi powiadomieniami i ustawieniami
           </p>
           {requestError && <p className="text-sm text-destructive mt-2">{requestError}</p>}
+          {lockedByAdmin && !isAdmin && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Ustawienia sa zarzadzane centralnie przez administratora firmy.
+            </p>
+          )}
         </div>
         {unreadCount > 0 && (
           <Button variant="outline" onClick={markAllAsRead}>
@@ -256,43 +342,124 @@ export default function PowiadomieniaPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Powiadomienia email</p>
-                  <p className="text-sm text-muted-foreground">
-                    Otrzymuj powiadomienia na email
-                  </p>
+              <div className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Powiadomienia email</p>
+                    <p className="text-sm text-muted-foreground">Otrzymuj powiadomienia na email</p>
+                  </div>
+                  <Switch
+                    checked={settings.emailEnabled}
+                    disabled={settingsSaving || (lockedByAdmin && !isAdmin)}
+                    onCheckedChange={(checked) => void updatePreference({ emailEnabled: checked })}
+                  />
                 </div>
-                <Switch
-                  checked={emailNotifications}
-                  onCheckedChange={setEmailNotifications}
-                />
+
+                {settings.emailEnabled && (
+                  <div className="space-y-3 border-t pt-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Alerty o rezerwacjach</p>
+                        <p className="text-sm text-muted-foreground">Potwierdzenia i anulacje rezerwacji</p>
+                      </div>
+                      <Switch
+                        checked={settings.emailReservationAlerts}
+                        disabled={settingsSaving || (lockedByAdmin && !isAdmin)}
+                        onCheckedChange={(checked) => void updatePreference({ emailReservationAlerts: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Alerty o wnioskach</p>
+                        <p className="text-sm text-muted-foreground">Decyzje i nowe wnioski wymagajace akceptacji</p>
+                      </div>
+                      <Switch
+                        checked={settings.emailRequestAlerts}
+                        disabled={settingsSaving || (lockedByAdmin && !isAdmin)}
+                        onCheckedChange={(checked) => void updatePreference({ emailRequestAlerts: checked })}
+                      />
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">Codzienne podsumowanie</p>
+                          <p className="text-sm text-muted-foreground">Dzienny raport na email dla administratora</p>
+                        </div>
+                        <Switch
+                          checked={settings.emailDailySummary}
+                          disabled={settingsSaving}
+                          onCheckedChange={(checked) =>
+                            void updatePreference({
+                              emailDailySummary: checked,
+                              dailySummary: checked || settings.inAppDailySummary,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
               <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Powiadomienia push</p>
-                  <p className="text-sm text-muted-foreground">
-                    Powiadomienia w przegladarce
-                  </p>
+
+              <div className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Powiadomienia w aplikacji</p>
+                    <p className="text-sm text-muted-foreground">Powiadomienia widoczne na liscie w aplikacji</p>
+                  </div>
+                  <Switch
+                    checked={settings.inAppEnabled}
+                    disabled={settingsSaving || (lockedByAdmin && !isAdmin)}
+                    onCheckedChange={(checked) => void updatePreference({ inAppEnabled: checked })}
+                  />
                 </div>
-                <Switch
-                  checked={pushNotifications}
-                  onCheckedChange={setPushNotifications}
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Przypomnienia</p>
-                  <p className="text-sm text-muted-foreground">
-                    Przypomnienia o rezerwacjach
-                  </p>
-                </div>
-                <Switch
-                  checked={reminderNotifications}
-                  onCheckedChange={setReminderNotifications}
-                />
+
+                {settings.inAppEnabled && (
+                  <div className="space-y-3 border-t pt-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Alerty o rezerwacjach</p>
+                        <p className="text-sm text-muted-foreground">Potwierdzenia i anulacje rezerwacji</p>
+                      </div>
+                      <Switch
+                        checked={settings.inAppReservationAlerts}
+                        disabled={settingsSaving || (lockedByAdmin && !isAdmin)}
+                        onCheckedChange={(checked) => void updatePreference({ inAppReservationAlerts: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Alerty o wnioskach</p>
+                        <p className="text-sm text-muted-foreground">Decyzje i nowe wnioski wymagajace akceptacji</p>
+                      </div>
+                      <Switch
+                        checked={settings.inAppRequestAlerts}
+                        disabled={settingsSaving || (lockedByAdmin && !isAdmin)}
+                        onCheckedChange={(checked) => void updatePreference({ inAppRequestAlerts: checked })}
+                      />
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">Codzienne podsumowanie</p>
+                          <p className="text-sm text-muted-foreground">Dzienny raport w aplikacji dla administratora</p>
+                        </div>
+                        <Switch
+                          checked={settings.inAppDailySummary}
+                          disabled={settingsSaving}
+                          onCheckedChange={(checked) =>
+                            void updatePreference({
+                              inAppDailySummary: checked,
+                              dailySummary: checked || settings.emailDailySummary,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -318,7 +485,7 @@ export default function PowiadomieniaPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-chart-5/10">
                   <Clock className="h-4 w-4 text-chart-5" />
                 </div>
-                <span className="text-sm">Przypomnienia</span>
+                <span className="text-sm">Statusy i informacje</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-chart-3/10">

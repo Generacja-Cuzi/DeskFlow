@@ -63,63 +63,77 @@ const recentActivity = [
 export default function DashboardPage() {
   const { branding } = useBranding()
   const [stats, setStats] = useState(defaultStats)
+  const [employeeName, setEmployeeName] = useState("Uzytkowniku")
 
   useEffect(() => {
-    const loadStats = async () => {
-      const response = await fetch('/api/dashboard/overview', { cache: 'no-store' })
-      if (!response.ok) return
-
-      const data = await response.json()
-      const next = data?.stats
-      if (!next) return
-
-      setStats([
-        {
-          name: "Aktywne rezerwacje",
-          value: String(next.activeReservations ?? 0),
-          total: "",
-          icon: Calendar,
-          href: "/rezerwacje",
-          color: "text-chart-5",
-          bgColor: "bg-chart-5/10",
-        },
-        {
-          name: "Uzytkownicy",
-          value: String(next.users ?? 0),
-          total: "",
-          icon: Users,
-          href: "/admin",
-          color: "text-accent",
-          bgColor: "bg-accent/10",
-        },
-        {
-          name: "Dostepne biurka",
-          value: String(next.availableDesks ?? 0),
-          total: String(next.totalDesks ?? 0),
-          icon: Monitor,
-          href: "/biurka",
-          color: "text-primary",
-          bgColor: "bg-primary/10",
-        },
-        {
-          name: "Wypozyczony sprzet",
-          value: String(next.borrowedEquipment ?? 0),
-          total: "",
-          icon: Package,
-          href: "/sprzet",
-          color: "text-chart-3",
-          bgColor: "bg-chart-3/10",
-        },
+    const loadDashboardData = async () => {
+      const [overviewResponse, meResponse] = await Promise.all([
+        fetch('/api/dashboard/overview', { cache: 'no-store' }),
+        fetch('/api/auth/me', { cache: 'no-store' }),
       ])
+
+      if (overviewResponse.ok) {
+        const data = await overviewResponse.json()
+        const next = data?.stats
+
+        if (next) {
+          setStats([
+            {
+              name: "Aktywne rezerwacje",
+              value: String(next.activeReservations ?? 0),
+              total: "",
+              icon: Calendar,
+              href: "/rezerwacje",
+              color: "text-blue-500",
+              bgColor: "bg-blue-500/10",
+            },
+            {
+              name: "Uzytkownicy",
+              value: String(next.users ?? 0),
+              total: String(next.usersLimit ?? 0),
+              icon: Users,
+              href: "/admin",
+              color: "text-emerald-500",
+              bgColor: "bg-emerald-500/10",
+            },
+            {
+              name: "Dostepne biurka",
+              value: String(next.availableDesks ?? 0),
+              total: String(next.totalDesks ?? 0),
+              icon: Monitor,
+              href: "/biurka",
+              color: "text-amber-500",
+              bgColor: "bg-amber-500/10",
+            },
+            {
+              name: "Dostepny sprzet",
+              value: String(next.availableEquipment ?? 0),
+              total: String(next.totalEquipment ?? 0),
+              icon: Package,
+              href: "/sprzet",
+              color: "text-purple-500",
+              bgColor: "bg-purple-500/10",
+            },
+          ])
+        }
+      }
+
+      if (meResponse.ok) {
+        const meData = await meResponse.json()
+        const fullName = typeof meData?.user?.name === "string" ? meData.user.name.trim() : ""
+        if (fullName) {
+          setEmployeeName(fullName.split(/\s+/)[0])
+        }
+      }
     }
 
-    loadStats()
+    loadDashboardData()
   }, [])
 
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Witaj, Jan!</h1>
+        <h1 className="text-2xl font-bold text-foreground">Witaj, {employeeName}!</h1>
         <p className="text-muted-foreground mt-1">
           Oto podsumowanie dostepnosci zasobow w firmie {branding.name}.
         </p>

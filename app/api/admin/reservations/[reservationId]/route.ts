@@ -42,6 +42,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ reservatio
     },
     reservationLabel: existing.name,
     reason: 'Rezerwacja zostala usunieta przez administratora.',
+    companyId,
+    userId: existing.userId || undefined,
   })
 
   return NextResponse.json({ ok: true })

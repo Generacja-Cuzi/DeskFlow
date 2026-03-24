@@ -51,6 +51,8 @@ export async function GET() {
           },
           resourceName: reservation.name,
           dueAt: reservation.endAt,
+          companyId,
+          userId: reservation.userId || undefined,
         })
       )
     )

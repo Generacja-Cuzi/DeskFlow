@@ -50,6 +50,7 @@ export function AppSidebar() {
   const { logo, fallback, primaryColor, companyName } = useCompanyLogo()
   const [resolvedRole, setResolvedRole] = useState<"superadmin" | "admin" | "user">("user")
   const [impersonatedCompanyName, setImpersonatedCompanyName] = useState<string | null>(null)
+  const [activeCompanyName, setActiveCompanyName] = useState<string | null>(null)
   const [membershipCount, setMembershipCount] = useState(0)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
 
@@ -62,6 +63,11 @@ export function AppSidebar() {
       const role = (data?.user?.role as "superadmin" | "admin" | "user" | undefined) || "user"
       setResolvedRole(role)
       setMembershipCount(Array.isArray(data?.memberships) ? data.memberships.length : 0)
+
+      const selectedCompanyId = data?.selectedCompanyId
+      const memberships = Array.isArray(data?.memberships) ? data.memberships : []
+      const matchedMembership = memberships.find((membership: { companyId?: string }) => membership.companyId === selectedCompanyId)
+      setActiveCompanyName(typeof matchedMembership?.companyName === 'string' ? matchedMembership.companyName : null)
 
       if (data?.impersonation?.active) {
         setImpersonatedCompanyName(data?.impersonation?.companyName || "Wybrana firma")
@@ -132,6 +138,7 @@ export function AppSidebar() {
   const isSuperAdmin = currentUser.role === "superadmin" && !isImpersonating
   const canAccessAdmin = currentUser.role === "admin" || isImpersonating
   const canSwitchCompany = membershipCount > 1 && !isImpersonating && currentUser.role !== "superadmin"
+  const headerCompanyName = impersonatedCompanyName || activeCompanyName || companyName
 
   const handleExitImpersonation = async () => {
     await fetch('/api/superadmin/impersonation', {
@@ -176,7 +183,7 @@ export function AppSidebar() {
       <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
         <Avatar className="h-10 w-10">
           {logo ? (
-            <AvatarImage src={logo} alt={companyName} className="object-contain" />
+            <AvatarImage src={logo} alt={headerCompanyName} className="object-contain" />
           ) : (
             <AvatarFallback 
               style={{ backgroundColor: primaryColor }} 
@@ -187,7 +194,7 @@ export function AppSidebar() {
           )}
         </Avatar>
         <div>
-          <h1 className="font-semibold text-lg">{companyName}</h1>
+          <h1 className="font-semibold text-lg">{headerCompanyName}</h1>
           <p className="text-xs text-sidebar-foreground/60">Rezerwacje i zasoby</p>
         </div>
       </div>
