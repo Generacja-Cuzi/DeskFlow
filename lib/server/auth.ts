@@ -91,10 +91,18 @@ export async function getActor() {
   const nextName =
     clerkProfile?.fullName || clerkProfile?.firstName || clerkProfile?.username || userByEmail.name
 
+  if (userByEmail.id !== userId) {
+    // Keep DB primary key stable (often pending-*) to avoid FK violations in related tables.
+    console.warn('[auth] Clerk user id does not match DB user id. Keeping existing DB id to preserve references.', {
+      clerkUserId: userId,
+      dbUserId: userByEmail.id,
+      email: normalizedEmail,
+    })
+  }
+
   await db
     .update(users)
     .set({
-      id: userId,
       name: nextName,
       email: normalizedEmail,
       role: isSuperadminEmail ? 'superadmin' : userByEmail.role,
@@ -103,7 +111,7 @@ export async function getActor() {
     .where(eq(users.id, userByEmail.id))
 
   const linkedUser = await db.query.users.findFirst({
-    where: eq(users.id, userId),
+    where: eq(users.id, userByEmail.id),
   })
 
   return {
