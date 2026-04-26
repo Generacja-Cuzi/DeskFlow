@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: 'DeskFlow - System Rezerwacji Biura',
   description: 'System rezerwacji biurek, sal konferencyjnych i wypozyczania zasobow firmowych',
   icons: {
-    icon: '/icon.svg',
+    icon: '/favicon.ico',
   },
 }
 
