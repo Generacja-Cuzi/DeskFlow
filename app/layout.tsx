@@ -10,6 +10,9 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'DeskFlow - System Rezerwacji Biura',
   description: 'System rezerwacji biurek, sal konferencyjnych i wypozyczania zasobow firmowych',
+  icons: {
+    icon: '/icon.svg',
+  },
 }
 
 export default function RootLayout({
