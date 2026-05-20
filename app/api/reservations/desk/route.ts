@@ -114,23 +114,31 @@ export async function POST(request: Request) {
     })
     .where(and(eq(floorElements.id, body.deskId), eq(floorElements.type, 'desk')))
 
-  await createNotification({
-    companyId,
-    userId: actor.user.id,
-    type: 'reservation',
-    title: 'Rezerwacja biurka potwierdzona',
-    message: `Biurko ${desk.name} zostalo zarezerwowane na ${date}.`,
-  })
+  try {
+    await createNotification({
+      companyId,
+      userId: actor.user.id,
+      type: 'reservation',
+      title: 'Rezerwacja biurka potwierdzona',
+      message: `Biurko ${desk.name} zostalo zarezerwowane na ${date}.`,
+    })
 
-  await sendReservationConfirmedEmail({
-    recipient: {
-      email: actor.user.email,
-      name: actor.user.name,
-    },
-    reservationLabel: `Biurko ${desk.name}, ${date}, ${startAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}-${endAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`,
-    companyId,
-    userId: actor.user.id,
-  })
+    await sendReservationConfirmedEmail({
+      recipient: {
+        email: actor.user.email,
+        name: actor.user.name,
+      },
+      reservationLabel: `Biurko ${desk.name}, ${date}, ${startAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}-${endAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`,
+      companyId,
+      userId: actor.user.id,
+    })
+  } catch (err) {
+    // Log notification/email errors but don't fail the reservation
+    // This prevents issues like invalid OAuth refresh tokens from returning 500
+    // while still creating the reservation record successfully.
+    // eslint-disable-next-line no-console
+    console.error('Failed to send reservation notification/email:', err)
+  }
 
   return NextResponse.json({ ok: true })
 }

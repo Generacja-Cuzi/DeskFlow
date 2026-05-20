@@ -61,13 +61,18 @@ export async function sendMail(payload: MailPayload) {
     return { ok: false as const, skipped: true as const }
   }
 
-  await tx.sendMail({
-    from,
-    to: payload.to,
-    subject: payload.subject,
-    text: payload.text,
-    html: payload.html,
-  })
+  try {
+    await tx.sendMail({
+      from,
+      to: payload.to,
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html,
+    })
 
-  return { ok: true as const, skipped: false as const }
+    return { ok: true as const, skipped: false as const }
+  } catch (error) {
+    console.error('Failed to send email:', error)
+    return { ok: false as const, skipped: false as const }
+  }
 }

@@ -27,12 +27,16 @@ import {
   Grid3X3,
   Search,
   Filter,
-  Calendar,
+  Calendar as CalendarIcon,
   Clock,
   Users,
   Monitor,
   MapPin,
 } from "lucide-react"
+import { format } from "date-fns"
+import { pl } from "date-fns/locale"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { FloorElement, InteractiveFloorPlanProps, DeskReservationRequest, RoomReservationRequest } from "@/lib/types"
 import { useReservation, useCurrentFloorPlan, useFilteredElements } from "@/lib/contexts/reservation-context"
 import { toast } from "@/hooks/use-toast"
@@ -49,6 +53,7 @@ function ReservationDialog({ element, isOpen, onClose, onReserve }: ReservationD
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("")
   const [meetingTitle, setMeetingTitle] = useState("")
   const [participantCount, setParticipantCount] = useState(1)
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
   const handleReserve = async () => {
     if (!element) return
@@ -58,16 +63,18 @@ function ReservationDialog({ element, isOpen, onClose, onReserve }: ReservationD
       let success = false
 
       if (element.type === "desk") {
+        const selectedDateString = format(selectedDate, "yyyy-MM-dd")
         const request: DeskReservationRequest = {
           deskId: element.id,
           userId: "current-user", // In real app, get from auth context
           userName: "Jan Kowalski", // In real app, get from auth context
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours
-          date: new Date().toISOString().split("T")[0],
+          startTime: "09:00",
+          endTime: "17:00",
+          date: selectedDateString,
         }
         success = await onReserve(request)
       } else if (element.type === "room" && selectedTimeSlot) {
+        const selectedDateString = format(selectedDate, "yyyy-MM-dd")
         const request: RoomReservationRequest = {
           roomId: element.id,
           userId: "current-user",
@@ -75,7 +82,7 @@ function ReservationDialog({ element, isOpen, onClose, onReserve }: ReservationD
           meetingTitle: meetingTitle || "Spotkanie",
           participantCount,
           timeSlot: selectedTimeSlot,
-          date: new Date().toISOString().split("T")[0],
+          date: selectedDateString,
         }
         success = await onReserve(request)
       }
@@ -123,6 +130,20 @@ function ReservationDialog({ element, isOpen, onClose, onReserve }: ReservationD
         </DialogHeader>
 
         <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Data</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[220px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(selectedDate, "PPP", { locale: pl })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
+              </PopoverContent>
+            </Popover>
+          </div>
           {/* Element details */}
           <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
             <div>
