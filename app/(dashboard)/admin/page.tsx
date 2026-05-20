@@ -146,6 +146,14 @@ type AdminResource = {
   workflowDueDate?: string | null
 }
 
+type NewUserState = {
+  name: string
+  email: string
+  department: string
+}
+
+type NewUserErrors = Partial<Record<keyof NewUserState, string>>
+
 type ResourceFormState = {
   name: string
   category: string
@@ -217,11 +225,12 @@ export default function AdminPage() {
   const [deskReservationsState, setDeskReservationsState] = useState<AdminReservation[]>([])
   const [roomReservationsState, setRoomReservationsState] = useState<AdminReservation[]>([])
   const [loadingReservations, setLoadingReservations] = useState(false)
-  const [newUser, setNewUser] = useState({
+  const [newUser, setNewUser] = useState<NewUserState>({
     name: "",
     email: "",
     department: "",
   })
+  const [newUserErrors, setNewUserErrors] = useState<NewUserErrors>({})
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [editingResource, setEditingResource] = useState<AdminResource | null>(null)
   const [resourceForm, setResourceForm] = useState<ResourceFormState>({
@@ -257,6 +266,8 @@ export default function AdminPage() {
 
     return undefined
   }
+
+  const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 
   const validateResourceForm = (form: ResourceFormState): ResourceFormErrors => ({
     name: validateResourceField("name", form.name),
@@ -332,13 +343,40 @@ export default function AdminPage() {
   }, [filterFromDate, filterToDate, filterFromTime, filterToTime])
 
   const handleAddUser = async () => {
+    const errors: NewUserErrors = {
+      name: newUser.name.trim() ? undefined : "Podaj imie i nazwisko.",
+      email: newUser.email.trim()
+        ? isValidEmail(newUser.email.trim())
+          ? undefined
+          : "Niepoprawny adres email."
+        : "Podaj adres email.",
+    }
+
+    setNewUserErrors(errors)
+    if (Object.values(errors).some(Boolean)) {
+      return
+    }
+
     const response = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newUser),
     })
 
-    if (!response.ok) return
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      if (payload?.error === 'Missing required fields') {
+        setNewUserErrors({
+          name: newUser.name.trim() ? undefined : "Podaj imie i nazwisko.",
+          email: newUser.email.trim()
+            ? isValidEmail(newUser.email.trim())
+              ? undefined
+              : "Niepoprawny adres email."
+            : "Podaj adres email.",
+        })
+      }
+      return
+    }
 
     setShowAddUserDialog(false)
     setNewUser({
@@ -346,6 +384,7 @@ export default function AdminPage() {
       email: "",
       department: "",
     })
+    setNewUserErrors({})
     await loadOverview()
   }
 
@@ -1403,25 +1442,45 @@ export default function AdminPage() {
           </DialogHeader>
           <div className="py-4 space-y-4">
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(newUserErrors.name)}>
                 <FieldLabel>Imie i nazwisko</FieldLabel>
                 <Input
                   placeholder="np. Jan Kowalski"
                   value={newUser.name}
-                  onChange={(event) => setNewUser({ ...newUser, name: event.target.value })}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setNewUser((prev) => ({ ...prev, name: value }))
+                    setNewUserErrors((prev) => ({
+                      ...prev,
+                      name: value.trim() ? undefined : "Podaj imie i nazwisko.",
+                    }))
+                  }}
                 />
+                <FieldError>{newUserErrors.name}</FieldError>
               </Field>
             </FieldGroup>
 
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(newUserErrors.email)}>
                 <FieldLabel>Email</FieldLabel>
                 <Input
                   type="email"
                   placeholder="jan.kowalski@firma.pl"
                   value={newUser.email}
-                  onChange={(event) => setNewUser({ ...newUser, email: event.target.value })}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setNewUser((prev) => ({ ...prev, email: value }))
+                    setNewUserErrors((prev) => ({
+                      ...prev,
+                      email: value.trim()
+                        ? isValidEmail(value.trim())
+                          ? undefined
+                          : "Niepoprawny adres email."
+                        : "Podaj adres email.",
+                    }))
+                  }}
                 />
+                <FieldError>{newUserErrors.email}</FieldError>
               </Field>
             </FieldGroup>
 

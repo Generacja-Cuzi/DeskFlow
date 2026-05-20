@@ -27,7 +27,7 @@ import {
 import { format } from "date-fns"
 import { pl } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 
 type EquipmentCategory = "laptops" | "monitors" | "projectors" | "vehicles" | "accessories"
 type EquipmentStatus = "available" | "borrowed" | "maintenance"
@@ -383,7 +383,7 @@ export default function SprzetPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <FieldGroup>
-                <Field>
+                <Field data-invalid={Boolean(borrowDateError)}>
                   <FieldLabel>Data wypozyczenia</FieldLabel>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -409,7 +409,7 @@ export default function SprzetPage() {
               </FieldGroup>
 
               <FieldGroup>
-                <Field>
+                <Field data-invalid={Boolean(borrowDateError)}>
                   <FieldLabel>Data zwrotu</FieldLabel>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -435,6 +435,8 @@ export default function SprzetPage() {
               </FieldGroup>
             </div>
 
+            {borrowDateError && <FieldError>{borrowDateError}</FieldError>}
+
             <FieldGroup>
               <Field>
                 <FieldLabel>Cel wypozyczenia</FieldLabel>
@@ -456,7 +458,6 @@ export default function SprzetPage() {
               </p>
             </div>
 
-            {borrowDateError && <p className="text-sm text-destructive">{borrowDateError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBorrowDialog(false)}>

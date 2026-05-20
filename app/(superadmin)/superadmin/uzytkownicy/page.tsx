@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 
 type Company = {
   id: string
@@ -26,6 +26,8 @@ type UserRow = {
   companyId: string | null
 }
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
 export default function SuperadminUsersPage() {
   const [activeTab, setActiveTab] = useState<"company" | "application">("company")
   const [companies, setCompanies] = useState<Company[]>([])
@@ -39,11 +41,13 @@ export default function SuperadminUsersPage() {
     email: "",
     department: "",
   })
+  const [newCompanyUserErrors, setNewCompanyUserErrors] = useState<{ name?: string; email?: string; companyId?: string }>({})
   const [newSuperadmin, setNewSuperadmin] = useState({
     name: "",
     email: "",
     department: "Management",
   })
+  const [newSuperadminErrors, setNewSuperadminErrors] = useState<{ name?: string; email?: string }>({})
 
   const loadData = async (scope: "company" | "application", companyId?: string) => {
     const params = new URLSearchParams()
@@ -121,7 +125,18 @@ export default function SuperadminUsersPage() {
   }
 
   const handleAddCompanyUser = async () => {
-    if (!selectedCompanyId) return
+    const errors = {
+      name: newCompanyUser.name.trim() ? undefined : "Podaj imie i nazwisko.",
+      email: newCompanyUser.email.trim()
+        ? isValidEmail(newCompanyUser.email.trim())
+          ? undefined
+          : "Niepoprawny adres email."
+        : "Podaj adres email.",
+      companyId: selectedCompanyId ? undefined : "Wybierz firme.",
+    }
+
+    setNewCompanyUserErrors(errors)
+    if (Object.values(errors).some(Boolean)) return
 
     const response = await fetch("/api/superadmin/users", {
       method: "POST",
@@ -133,7 +148,23 @@ export default function SuperadminUsersPage() {
       }),
     })
 
-    if (!response.ok) return
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      if (payload?.error === 'Missing required fields') {
+        setNewCompanyUserErrors({
+          name: newCompanyUser.name.trim() ? undefined : "Podaj imie i nazwisko.",
+          email: newCompanyUser.email.trim()
+            ? isValidEmail(newCompanyUser.email.trim())
+              ? undefined
+              : "Niepoprawny adres email."
+            : "Podaj adres email.",
+        })
+      }
+      if (payload?.error === 'Missing companyId') {
+        setNewCompanyUserErrors((prev) => ({ ...prev, companyId: "Wybierz firme." }))
+      }
+      return
+    }
 
     setIsAddCompanyUserOpen(false)
     setNewCompanyUser({
@@ -141,10 +172,23 @@ export default function SuperadminUsersPage() {
       email: "",
       department: "",
     })
+    setNewCompanyUserErrors({})
     await loadData("company", selectedCompanyId)
   }
 
   const handleAddSuperadmin = async () => {
+    const errors = {
+      name: newSuperadmin.name.trim() ? undefined : "Podaj imie i nazwisko.",
+      email: newSuperadmin.email.trim()
+        ? isValidEmail(newSuperadmin.email.trim())
+          ? undefined
+          : "Niepoprawny adres email."
+        : "Podaj adres email.",
+    }
+
+    setNewSuperadminErrors(errors)
+    if (Object.values(errors).some(Boolean)) return
+
     const response = await fetch("/api/superadmin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -154,7 +198,20 @@ export default function SuperadminUsersPage() {
       }),
     })
 
-    if (!response.ok) return
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      if (payload?.error === 'Missing required fields') {
+        setNewSuperadminErrors({
+          name: newSuperadmin.name.trim() ? undefined : "Podaj imie i nazwisko.",
+          email: newSuperadmin.email.trim()
+            ? isValidEmail(newSuperadmin.email.trim())
+              ? undefined
+              : "Niepoprawny adres email."
+            : "Podaj adres email.",
+        })
+      }
+      return
+    }
 
     setIsAddSuperadminOpen(false)
     setNewSuperadmin({
@@ -162,6 +219,7 @@ export default function SuperadminUsersPage() {
       email: "",
       department: "Management",
     })
+    setNewSuperadminErrors({})
     await loadData("application")
   }
 
@@ -365,18 +423,55 @@ export default function SuperadminUsersPage() {
             <DialogDescription>Nowe konto zostanie przypisane do wybranej firmy.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Imie i nazwisko</Label>
-              <Input value={newCompanyUser.name} onChange={(event) => setNewCompanyUser({ ...newCompanyUser, name: event.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={newCompanyUser.email} onChange={(event) => setNewCompanyUser({ ...newCompanyUser, email: event.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Dzial</Label>
-              <Input value={newCompanyUser.department} onChange={(event) => setNewCompanyUser({ ...newCompanyUser, department: event.target.value })} />
-            </div>
+            <FieldGroup>
+              <Field data-invalid={Boolean(newCompanyUserErrors.name)}>
+                <FieldLabel>Imie i nazwisko</FieldLabel>
+                <Input
+                  value={newCompanyUser.name}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setNewCompanyUser((prev) => ({ ...prev, name: value }))
+                    setNewCompanyUserErrors((prev) => ({
+                      ...prev,
+                      name: value.trim() ? undefined : "Podaj imie i nazwisko.",
+                    }))
+                  }}
+                />
+                <FieldError>{newCompanyUserErrors.name}</FieldError>
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field data-invalid={Boolean(newCompanyUserErrors.email)}>
+                <FieldLabel>Email</FieldLabel>
+                <Input
+                  type="email"
+                  value={newCompanyUser.email}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setNewCompanyUser((prev) => ({ ...prev, email: value }))
+                    setNewCompanyUserErrors((prev) => ({
+                      ...prev,
+                      email: value.trim()
+                        ? isValidEmail(value.trim())
+                          ? undefined
+                          : "Niepoprawny adres email."
+                        : "Podaj adres email.",
+                    }))
+                  }}
+                />
+                <FieldError>{newCompanyUserErrors.email}</FieldError>
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Dzial</FieldLabel>
+                <Input
+                  value={newCompanyUser.department}
+                  onChange={(event) => setNewCompanyUser({ ...newCompanyUser, department: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
+            {newCompanyUserErrors.companyId && <FieldError>{newCompanyUserErrors.companyId}</FieldError>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddCompanyUserOpen(false)}>Anuluj</Button>
@@ -392,18 +487,54 @@ export default function SuperadminUsersPage() {
             <DialogDescription>Konto otrzyma globalny dostep do calej aplikacji.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Imie i nazwisko</Label>
-              <Input value={newSuperadmin.name} onChange={(event) => setNewSuperadmin({ ...newSuperadmin, name: event.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={newSuperadmin.email} onChange={(event) => setNewSuperadmin({ ...newSuperadmin, email: event.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Dzial</Label>
-              <Input value={newSuperadmin.department} onChange={(event) => setNewSuperadmin({ ...newSuperadmin, department: event.target.value })} />
-            </div>
+            <FieldGroup>
+              <Field data-invalid={Boolean(newSuperadminErrors.name)}>
+                <FieldLabel>Imie i nazwisko</FieldLabel>
+                <Input
+                  value={newSuperadmin.name}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setNewSuperadmin((prev) => ({ ...prev, name: value }))
+                    setNewSuperadminErrors((prev) => ({
+                      ...prev,
+                      name: value.trim() ? undefined : "Podaj imie i nazwisko.",
+                    }))
+                  }}
+                />
+                <FieldError>{newSuperadminErrors.name}</FieldError>
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field data-invalid={Boolean(newSuperadminErrors.email)}>
+                <FieldLabel>Email</FieldLabel>
+                <Input
+                  type="email"
+                  value={newSuperadmin.email}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setNewSuperadmin((prev) => ({ ...prev, email: value }))
+                    setNewSuperadminErrors((prev) => ({
+                      ...prev,
+                      email: value.trim()
+                        ? isValidEmail(value.trim())
+                          ? undefined
+                          : "Niepoprawny adres email."
+                        : "Podaj adres email.",
+                    }))
+                  }}
+                />
+                <FieldError>{newSuperadminErrors.email}</FieldError>
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Dzial</FieldLabel>
+                <Input
+                  value={newSuperadmin.department}
+                  onChange={(event) => setNewSuperadmin({ ...newSuperadmin, department: event.target.value })}
+                />
+              </Field>
+            </FieldGroup>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddSuperadminOpen(false)}>Anuluj</Button>
