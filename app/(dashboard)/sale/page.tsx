@@ -9,6 +9,7 @@ import { InteractiveFloorPlan } from "@/components/interactive-floor-plan"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Card,
   CardContent,
@@ -37,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useReservation } from "@/lib/contexts/reservation-context"
 import type { FloorElement } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 type BusySlot = {
   startAt: string
@@ -160,6 +162,7 @@ function getFreeIntervals(busySlots: BusySlot[]) {
 }
 
 export default function SalePage() {
+  const { toast } = useToast()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [startTime, setStartTime] = useState("09:00")
   const [endTime, setEndTime] = useState("10:00")
@@ -170,6 +173,7 @@ export default function SalePage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [reservationDraft, setReservationDraft] = useState<RoomReservationDraft | null>(null)
   const [viewMode, setViewMode] = useState("map")
+  const [reservationError, setReservationError] = useState<string | null>(null)
 
   const { rooms, currentFloor, floorPlans, setCurrentFloor } = useReservation()
 
@@ -242,6 +246,7 @@ export default function SalePage() {
       return
     }
 
+    setReservationError(null)
     setReservationDraft({
       roomId,
       name: room.name,
@@ -265,26 +270,56 @@ export default function SalePage() {
       return
     }
 
+    setReservationError(null)
     setSubmittingRoomId(roomId)
 
-    const response = await fetch("/api/reservations/room", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        roomId,
-        date: selectedDateString,
-        startTime: rangeStart,
-        endTime: rangeEnd,
-        meetingTitle,
-        participantCount,
-      }),
-    })
+    try {
+      const response = await fetch("/api/reservations/room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId,
+          date: selectedDateString,
+          startTime: rangeStart,
+          endTime: rangeEnd,
+          meetingTitle,
+          participantCount,
+        }),
+      })
 
-    setSubmittingRoomId(null)
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const description =
+          typeof payload?.error === "string"
+            ? payload.error
+            : "Nie udalo sie zarezerwowac sali w wybranym przedziale czasu."
 
-    if (response.ok) {
+        setReservationError(description)
+        toast({
+          title: "Rezerwacja odrzucona",
+          description,
+          variant: "destructive",
+        })
+        return
+      }
+
       setDialogOpen(false)
       await loadAvailability()
+      setReservationError(null)
+      toast({
+        title: "Rezerwacja zapisana",
+        description: "Sala zostala zarezerwowana.",
+      })
+    } catch (error) {
+      const description = "Nie udalo sie zarezerwowac sali. Sprobuj ponownie."
+      setReservationError(description)
+      toast({
+        title: "Blad rezerwacji",
+        description,
+        variant: "destructive",
+      })
+    } finally {
+      setSubmittingRoomId(null)
     }
   }
 
@@ -398,14 +433,6 @@ export default function SalePage() {
           />
         </CardContent>
       </Card>
-
-      {hasInvalidRange && (
-        <Card className="border-destructive/40">
-          <CardContent className="pt-6 text-sm text-destructive">
-            Godzina konca musi byc pozniejsza niz godzina startu.
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -553,6 +580,7 @@ export default function SalePage() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        setReservationError(null)
                         setStartTime(interval.start)
                         setEndTime(interval.end)
                       }}
@@ -567,7 +595,13 @@ export default function SalePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Start</p>
-                <Select value={startTime} onValueChange={setStartTime}>
+                <Select
+                  value={startTime}
+                  onValueChange={(value) => {
+                    setReservationError(null)
+                    setStartTime(value)
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -582,7 +616,13 @@ export default function SalePage() {
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Koniec</p>
-                <Select value={endTime} onValueChange={setEndTime}>
+                <Select
+                  value={endTime}
+                  onValueChange={(value) => {
+                    setReservationError(null)
+                    setEndTime(value)
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -596,6 +636,20 @@ export default function SalePage() {
                 </Select>
               </div>
             </div>
+
+            {hasInvalidRange && (
+              <Alert variant="destructive">
+                <AlertTitle>Nieprawidlowy zakres godzin</AlertTitle>
+                <AlertDescription>Godzina konca musi byc pozniejsza niz godzina startu.</AlertDescription>
+              </Alert>
+            )}
+
+            {reservationError && (
+              <Alert variant="destructive">
+                <AlertTitle>Rezerwacja odrzucona</AlertTitle>
+                <AlertDescription>{reservationError}</AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <DialogFooter>

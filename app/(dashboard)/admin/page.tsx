@@ -27,7 +27,7 @@ import {
   FileText,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import {
   AreaChart,
   Area,
@@ -146,6 +146,17 @@ type AdminResource = {
   workflowDueDate?: string | null
 }
 
+type ResourceFormState = {
+  name: string
+  category: string
+  location: string
+  serialNumber: string
+  description: string
+  status: string
+}
+
+type ResourceFormErrors = Partial<Record<keyof ResourceFormState, string>>
+
 const equipmentCategories = [
   { value: "all", label: "Wszystkie" },
   { value: "laptops", label: "Laptopy" },
@@ -213,7 +224,7 @@ export default function AdminPage() {
   })
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [editingResource, setEditingResource] = useState<AdminResource | null>(null)
-  const [resourceForm, setResourceForm] = useState({
+  const [resourceForm, setResourceForm] = useState<ResourceFormState>({
     name: "",
     category: "laptops",
     location: "",
@@ -221,6 +232,46 @@ export default function AdminPage() {
     description: "",
     status: "available",
   })
+  const [resourceFormErrors, setResourceFormErrors] = useState<ResourceFormErrors>({})
+
+  const validateResourceField = (field: keyof ResourceFormState, value: string) => {
+    const trimmed = value.trim()
+
+    if (field === "name") {
+      if (!trimmed) return "Podaj nazwe zasobu."
+      if (trimmed.length < 3) return "Nazwa jest za krotka."
+    }
+
+    if (field === "location") {
+      if (!trimmed) return "Podaj lokalizacje zasobu."
+      if (trimmed.length < 2) return "Lokalizacja jest za krotka."
+    }
+
+    if (field === "category") {
+      if (!trimmed) return "Wybierz typ zasobu."
+    }
+
+    if (field === "serialNumber" && trimmed && trimmed.length < 3) {
+      return "Numer seryjny jest za krotki."
+    }
+
+    return undefined
+  }
+
+  const validateResourceForm = (form: ResourceFormState): ResourceFormErrors => ({
+    name: validateResourceField("name", form.name),
+    category: validateResourceField("category", form.category),
+    location: validateResourceField("location", form.location),
+    serialNumber: validateResourceField("serialNumber", form.serialNumber),
+  })
+
+  const setResourceFieldValue = (field: keyof ResourceFormState, value: string) => {
+    setResourceForm((prev) => ({ ...prev, [field]: value }))
+    setResourceFormErrors((prev) => ({
+      ...prev,
+      [field]: validateResourceField(field, value),
+    }))
+  }
 
   const loadAdminReservations = async () => {
     setLoadingReservations(true)
@@ -428,9 +479,15 @@ export default function AdminPage() {
       description: "",
       status: "available",
     })
+    setResourceFormErrors({})
   }
 
   const handleCreateResource = async () => {
+    const errors = validateResourceForm(resourceForm)
+    setResourceFormErrors(errors)
+    const hasErrors = Object.values(errors).some(Boolean)
+    if (hasErrors) return
+
     const response = await fetch("/api/admin/resources", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -446,6 +503,7 @@ export default function AdminPage() {
 
   const handleOpenEditResource = (resource: AdminResource) => {
     setEditingResource(resource)
+    setResourceFormErrors({})
     setResourceForm({
       name: resource.name,
       category: resource.category || "laptops",
@@ -1172,20 +1230,21 @@ export default function AdminPage() {
           </DialogHeader>
           <div className="py-4 space-y-4">
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(resourceFormErrors.name)}>
                 <FieldLabel>Nazwa zasobu</FieldLabel>
                 <Input
                   placeholder="np. MacBook Pro 14"
                   value={resourceForm.name}
-                  onChange={(event) => setResourceForm({ ...resourceForm, name: event.target.value })}
+                  onChange={(event) => setResourceFieldValue("name", event.target.value)}
                 />
+                <FieldError>{resourceFormErrors.name}</FieldError>
               </Field>
             </FieldGroup>
 
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(resourceFormErrors.category)}>
                 <FieldLabel>Typ zasobu</FieldLabel>
-                <Select value={resourceForm.category} onValueChange={(value) => setResourceForm({ ...resourceForm, category: value })}>
+                <Select value={resourceForm.category} onValueChange={(value) => setResourceFieldValue("category", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Wybierz typ" />
                   </SelectTrigger>
@@ -1197,28 +1256,31 @@ export default function AdminPage() {
                     <SelectItem value="accessories">Akcesorium</SelectItem>
                   </SelectContent>
                 </Select>
+                <FieldError>{resourceFormErrors.category}</FieldError>
               </Field>
             </FieldGroup>
 
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(resourceFormErrors.location)}>
                 <FieldLabel>Lokalizacja</FieldLabel>
                 <Input
                   placeholder="np. Magazyn IT"
                   value={resourceForm.location}
-                  onChange={(event) => setResourceForm({ ...resourceForm, location: event.target.value })}
+                  onChange={(event) => setResourceFieldValue("location", event.target.value)}
                 />
+                <FieldError>{resourceFormErrors.location}</FieldError>
               </Field>
             </FieldGroup>
 
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(resourceFormErrors.serialNumber)}>
                 <FieldLabel>Numer seryjny / Identyfikator</FieldLabel>
                 <Input
                   placeholder="np. SN-2024-001"
                   value={resourceForm.serialNumber}
-                  onChange={(event) => setResourceForm({ ...resourceForm, serialNumber: event.target.value })}
+                  onChange={(event) => setResourceFieldValue("serialNumber", event.target.value)}
                 />
+                <FieldError>{resourceFormErrors.serialNumber}</FieldError>
               </Field>
             </FieldGroup>
 
@@ -1228,7 +1290,7 @@ export default function AdminPage() {
                 <Input
                   placeholder="Krotki opis zasobu"
                   value={resourceForm.description}
-                  onChange={(event) => setResourceForm({ ...resourceForm, description: event.target.value })}
+                  onChange={(event) => setResourceFieldValue("description", event.target.value)}
                 />
               </Field>
             </FieldGroup>

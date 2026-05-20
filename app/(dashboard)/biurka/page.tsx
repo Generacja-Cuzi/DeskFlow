@@ -9,6 +9,7 @@ import { InteractiveFloorPlan } from "@/components/interactive-floor-plan"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Card,
   CardContent,
@@ -169,6 +170,7 @@ export default function BiurkaPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [reservationDraft, setReservationDraft] = useState<DeskReservationDraft | null>(null)
   const [viewMode, setViewMode] = useState("map")
+  const [reservationError, setReservationError] = useState<string | null>(null)
 
   const { desks, currentFloor, floorPlans, setCurrentFloor } = useReservation()
 
@@ -237,6 +239,7 @@ export default function BiurkaPage() {
       return
     }
 
+    setReservationError(null)
     setReservationDraft({
       deskId,
       name: desk.name,
@@ -265,42 +268,55 @@ export default function BiurkaPage() {
       return
     }
 
+    setReservationError(null)
     setSubmittingDeskId(deskId)
 
-    const response = await fetch("/api/reservations/desk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        deskId,
-        date: selectedDateString,
-        startTime: rangeStart,
-        endTime: rangeEnd,
-      }),
-    })
+    try {
+      const response = await fetch("/api/reservations/desk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deskId,
+          date: selectedDateString,
+          startTime: rangeStart,
+          endTime: rangeEnd,
+        }),
+      })
 
-    setSubmittingDeskId(null)
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const description =
+          typeof payload?.error === "string"
+            ? payload.error
+            : "Nie udalo sie zarezerwowac biurka w wybranym przedziale czasu."
 
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null)
-      const description =
-        typeof payload?.error === "string"
-          ? payload.error
-          : "Nie udalo sie zarezerwowac biurka w wybranym przedziale czasu."
+        setReservationError(description)
+        toast({
+          title: "Rezerwacja odrzucona",
+          description,
+          variant: "destructive",
+        })
+        return
+      }
 
+      setDialogOpen(false)
+      await loadAvailability()
+      setReservationError(null)
       toast({
-        title: "Rezerwacja odrzucona",
+        title: "Rezerwacja zapisana",
+        description: "Biurko zostalo zarezerwowane.",
+      })
+    } catch (error) {
+      const description = "Nie udalo sie zarezerwowac biurka. Sprobuj ponownie."
+      setReservationError(description)
+      toast({
+        title: "Blad rezerwacji",
         description,
         variant: "destructive",
       })
-      return
+    } finally {
+      setSubmittingDeskId(null)
     }
-
-    setDialogOpen(false)
-    await loadAvailability()
-    toast({
-      title: "Rezerwacja zapisana",
-      description: "Biurko zostalo zarezerwowane.",
-    })
   }
 
   const freeIntervals = useMemo(() => {
@@ -383,14 +399,6 @@ export default function BiurkaPage() {
           </Select>
         </div>
       </div>
-
-      {hasInvalidRange && (
-        <Card className="border-destructive/40">
-          <CardContent className="pt-6 text-sm text-destructive">
-            Godzina konca musi byc pozniejsza niz godzina startu.
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -536,6 +544,7 @@ export default function BiurkaPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        setReservationError(null)
                         setStartTime(interval.start)
                         setEndTime(interval.end)
                       }}
@@ -550,7 +559,13 @@ export default function BiurkaPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Start</p>
-                <Select value={startTime} onValueChange={setStartTime}>
+                <Select
+                  value={startTime}
+                  onValueChange={(value) => {
+                    setReservationError(null)
+                    setStartTime(value)
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -565,7 +580,13 @@ export default function BiurkaPage() {
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Koniec</p>
-                <Select value={endTime} onValueChange={setEndTime}>
+                <Select
+                  value={endTime}
+                  onValueChange={(value) => {
+                    setReservationError(null)
+                    setEndTime(value)
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -579,6 +600,20 @@ export default function BiurkaPage() {
                 </Select>
               </div>
             </div>
+
+            {hasInvalidRange && (
+              <Alert variant="destructive">
+                <AlertTitle>Nieprawidlowy zakres godzin</AlertTitle>
+                <AlertDescription>Godzina konca musi byc pozniejsza niz godzina startu.</AlertDescription>
+              </Alert>
+            )}
+
+            {reservationError && (
+              <Alert variant="destructive">
+                <AlertTitle>Rezerwacja odrzucona</AlertTitle>
+                <AlertDescription>{reservationError}</AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <DialogFooter>
