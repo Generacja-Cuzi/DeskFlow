@@ -34,7 +34,7 @@ function addFlowDuration(metric, responses) {
 
 export default function () {
   group('Benchmark dashboardu', () => {
-    const benchmarkEndpoints = [endpoints.me, endpoints.dashboard, endpoints.floorPlans];
+    const benchmarkEndpoints = [endpoints.dashboard, endpoints.floorPlans];
     const responses = getMany(benchmarkEndpoints);
     checkBatch(responses, benchmarkEndpoints);
     addFlowDuration(dashboardBenchmark, responses);

@@ -2,7 +2,6 @@
 
 Skrypty sa podzielone zgodnie z typami testow:
 
-- `01-user-flows.js` - testy uzytkownikow: sprawdzaja podstawowy przeplyw korzystania z aplikacji.
 - `02-performance.js` - testy wydajnosci: stabilnosc i czas odpowiedzi przy normalnym ruchu.
 - `03-response-time.js` - testy czasu odpowiedzi: progi p95 dla wybranych endpointow.
 - `04-benchmarks.js` - benchmarki: porownywalne wyniki dla przeplywu dashboardu i rezerwacji.
@@ -20,7 +19,6 @@ pnpm dev
 Potem uruchom wybrany test:
 
 ```bash
-k6 run tests/k6/01-user-flows.js
 k6 run tests/k6/02-performance.js
 k6 run tests/k6/03-response-time.js
 k6 run tests/k6/04-benchmarks.js
@@ -43,13 +41,13 @@ ACTIVE_COMPANY_ID=company-demo k6 run tests/k6/03-response-time.js
 Dla srodowisk z wymaganym logowaniem przekaż cookie sesji w `AUTH_COOKIE`:
 
 ```bash
-AUTH_COOKIE="__session=..." BASE_URL=https://twoja-aplikacja.example.com k6 run tests/k6/01-user-flows.js
+AUTH_COOKIE="__session=..." BASE_URL=https://twoja-aplikacja.example.com k6 run tests/k6/02-performance.js
 ```
 
 Jesli chcesz uruchomic test tylko po to, aby sprawdzic dostepnosc endpointow bez sesji, mozna tymczasowo dopuscic odpowiedzi `401` i `403`:
 
 ```bash
-ALLOW_AUTH_FAILURES=1 k6 run tests/k6/01-user-flows.js
+ALLOW_AUTH_FAILURES=1 k6 run tests/k6/02-performance.js
 ```
 
 ## Eksport do Grafana Cloud

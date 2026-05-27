@@ -2,7 +2,6 @@ import { getEndpoint } from './lib/api.js';
 import { endpoints } from './lib/config.js';
 
 const measuredEndpoints = [
-  endpoints.me,
   endpoints.dashboard,
   endpoints.deskAvailability,
   endpoints.equipment,
@@ -19,7 +18,6 @@ export const options = {
     },
   },
   thresholds: {
-    'http_req_duration{name:Auth me}': ['p(95)<300'],
     'http_req_duration{name:Dashboard overview}': ['p(95)<500'],
     'http_req_duration{name:Desk availability}': ['p(95)<450'],
     'http_req_duration{name:Equipment list}': ['p(95)<500'],

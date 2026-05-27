@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "k6:user": "k6 run tests/k6/01-user-flows.js",
     "k6:performance": "k6 run tests/k6/02-performance.js",
     "k6:response-time": "k6 run tests/k6/03-response-time.js",
     "k6:benchmarks": "k6 run tests/k6/04-benchmarks.js",

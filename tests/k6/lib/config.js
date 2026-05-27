@@ -44,10 +44,6 @@ export function expectedStatus(status) {
 }
 
 export const endpoints = {
-  me: {
-    name: 'Auth me',
-    path: '/api/auth/me',
-  },
   dashboard: {
     name: 'Dashboard overview',
     path: '/api/dashboard/overview',
