@@ -12,7 +12,7 @@
     "k6:benchmarks": "k6 run tests/k6/04-benchmarks.js",
     "k6:load": "k6 run tests/k6/05-load.js",
     "k6:scalability": "k6 run tests/k6/06-scalability.js",
-    "k6:all": "for f in tests/k6/0*.js; do echo \"\\n=== $f ===\\n\"; k6 run \"$f\" || exit 1; done",
+    "k6:all": "stamp=$(date +%Y%m%d-%H%M%S); out=tests/k6/results/$stamp; mkdir -p \"$out\"; for f in tests/k6/0*.js; do name=$(basename \"$f\" .js); printf '\\n=== %s -> %s ===\\n' \"$f\" \"$out/$name\"; k6 run --summary-export \"$out/$name.summary.json\" --out \"json=$out/$name.json\" \"$f\" || exit 1; done; printf '\\nSaved results to %s\\n' \"$out\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",

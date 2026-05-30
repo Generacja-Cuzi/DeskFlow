@@ -34,6 +34,27 @@ Domyslny adres to `http://localhost:3000`. Mozesz go zmienic przez `BASE_URL`, a
 ACTIVE_COMPANY_ID=company-demo k6 run tests/k6/03-response-time.js
 ```
 
+## Wszystkie testy + zapis wynikow
+
+Aby uruchomic cala serie po kolei i zapisac wyniki do plikow (wynik nadal jest drukowany w terminalu):
+
+```bash
+pnpm k6:all
+```
+
+Kazdy uruchomienie tworzy katalog `tests/k6/results/<timestamp>/` z dwoma plikami na test:
+
+- `<test>.summary.json` - zagregowane metryki (percentyle, liczniki, progi) - najwygodniejsze do prezentacji.
+- `<test>.json` - pelny strumien danych (kazdy request) do szczegolowej analizy (np. `jq`).
+
+Katalog `tests/k6/results/` jest ignorowany przez git.
+
+Przyklad wyciagniecia p95 czasu odpowiedzi dla endpointu z `summary.json`:
+
+```bash
+jq '.metrics.http_req_duration.values["p(95)"]' tests/k6/results/<timestamp>/02-performance.summary.json
+```
+
 ## Eksport do Grafana Cloud
 
 Przy skonfigurowanym k6 Cloud:
