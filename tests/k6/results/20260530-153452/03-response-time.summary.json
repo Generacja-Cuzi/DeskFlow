@@ -1,0 +1,213 @@
+{
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "Dashboard overview: status is OK": {
+                    "name": "Dashboard overview: status is OK",
+                    "path": "::Dashboard overview: status is OK",
+                    "id": "361f89e052dffb809dfac5408433d5e4",
+                    "passes": 7,
+                    "fails": 0
+                },
+                "Dashboard overview: response is JSON": {
+                    "name": "Dashboard overview: response is JSON",
+                    "path": "::Dashboard overview: response is JSON",
+                    "id": "e62984076f0ab45b1672eaeba647bdfa",
+                    "passes": 7,
+                    "fails": 0
+                },
+                "Desk availability: status is OK": {
+                    "passes": 6,
+                    "fails": 0,
+                    "name": "Desk availability: status is OK",
+                    "path": "::Desk availability: status is OK",
+                    "id": "18bba12c0e4809d371762f6f287332bf"
+                },
+                "Desk availability: response is JSON": {
+                    "fails": 0,
+                    "name": "Desk availability: response is JSON",
+                    "path": "::Desk availability: response is JSON",
+                    "id": "21da56d60c6d9deafb4928cafa2e05c7",
+                    "passes": 6
+                },
+                "Equipment list: status is OK": {
+                    "name": "Equipment list: status is OK",
+                    "path": "::Equipment list: status is OK",
+                    "id": "ef8f91b55729ed5e25f673b573095b10",
+                    "passes": 6,
+                    "fails": 0
+                },
+                "Equipment list: response is JSON": {
+                    "path": "::Equipment list: response is JSON",
+                    "id": "60cc8bb1cf40eb1e244427210093ab0b",
+                    "passes": 6,
+                    "fails": 0,
+                    "name": "Equipment list: response is JSON"
+                },
+                "Reservations mine: status is OK": {
+                    "fails": 0,
+                    "name": "Reservations mine: status is OK",
+                    "path": "::Reservations mine: status is OK",
+                    "id": "7bd85f88a1e4f0f37f8a0cf6a60ac5ba",
+                    "passes": 6
+                },
+                "Reservations mine: response is JSON": {
+                    "name": "Reservations mine: response is JSON",
+                    "path": "::Reservations mine: response is JSON",
+                    "id": "b983ba46ebe698634aef6a682574de3e",
+                    "passes": 6,
+                    "fails": 0
+                }
+            },
+        "name": ""
+    },
+    "metrics": {
+        "http_req_duration{name:Desk availability}": {
+            "min": 7.283,
+            "med": 8.091000000000001,
+            "max": 10.526,
+            "p(90)": 9.596,
+            "p(95)": 10.061,
+            "avg": 8.348666666666666,
+            "thresholds": {
+                "p(95)<450": false
+            }
+        },
+        "http_req_tls_handshaking": {
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0
+        },
+        "http_req_sending": {
+            "avg": 0.012800000000000004,
+            "min": 0.006,
+            "med": 0.012,
+            "max": 0.041,
+            "p(90)": 0.017400000000000002,
+            "p(95)": 0.0206
+        },
+        "checks": {
+            "passes": 50,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 25,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_receiving": {
+            "med": 0.067,
+            "max": 0.099,
+            "p(90)": 0.0908,
+            "p(95)": 0.09759999999999999,
+            "avg": 0.06604,
+            "min": 0.042
+        },
+        "data_sent": {
+            "count": 4175,
+            "rate": 17231.985867707877
+        },
+        "http_req_duration{name:Equipment list}": {
+            "p(90)": 10.1325,
+            "p(95)": 11.12475,
+            "avg": 8.374166666666666,
+            "min": 6.552,
+            "med": 7.878,
+            "max": 12.117,
+            "thresholds": {
+                "p(95)<500": false
+            }
+        },
+        "iterations": {
+            "count": 25,
+            "rate": 103.18554411801125
+        },
+        "http_reqs": {
+            "count": 25,
+            "rate": 103.18554411801125
+        },
+        "http_req_blocked": {
+            "med": 0.003,
+            "max": 0.436,
+            "p(90)": 0.005800000000000001,
+            "p(95)": 0.007,
+            "avg": 0.02032,
+            "min": 0.001
+        },
+        "iteration_duration": {
+            "avg": 9.66847512,
+            "min": 6.665583,
+            "med": 8.582834,
+            "max": 20.23475,
+            "p(90)": 11.800500000000001,
+            "p(95)": 17.021933599999993
+        },
+        "http_req_waiting": {
+            "avg": 9.4562,
+            "min": 6.441,
+            "med": 8.424,
+            "max": 19.988,
+            "p(90)": 11.6282,
+            "p(95)": 16.384999999999994
+        },
+        "http_req_duration{name:Reservations mine}": {
+            "min": 7.863,
+            "med": 8.4725,
+            "max": 11.099,
+            "p(90)": 9.864500000000001,
+            "p(95)": 10.48175,
+            "avg": 8.816333333333334,
+            "thresholds": {
+                "p(95)<500": false
+            }
+        },
+        "data_received": {
+            "count": 22619,
+            "rate": 93358.15289621185
+        },
+        "http_req_duration{name:Dashboard overview}": {
+            "min": 9.212,
+            "med": 9.686,
+            "max": 20.071,
+            "p(90)": 18.581200000000003,
+            "p(95)": 19.3261,
+            "avg": 12.163,
+            "thresholds": {
+                "p(95)<500": false
+            }
+        },
+        "http_req_connecting": {
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.0070799999999999995,
+            "min": 0,
+            "med": 0,
+            "max": 0.177
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(95)": 16.493799999999997,
+            "avg": 9.535039999999997,
+            "min": 6.552,
+            "med": 8.482,
+            "max": 20.071,
+            "p(90)": 11.709800000000001
+        },
+        "http_req_duration": {
+            "avg": 9.535039999999997,
+            "min": 6.552,
+            "med": 8.482,
+            "max": 20.071,
+            "p(90)": 11.709800000000001,
+            "p(95)": 16.493799999999997
+        }
+    }
+}

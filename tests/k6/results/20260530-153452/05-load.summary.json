@@ -1,0 +1,197 @@
+{
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "Dashboard overview: status is OK": {
+                    "fails": 0,
+                    "name": "Dashboard overview: status is OK",
+                    "path": "::Dashboard overview: status is OK",
+                    "id": "361f89e052dffb809dfac5408433d5e4",
+                    "passes": 2815
+                },
+                "Dashboard overview: response is JSON": {
+                    "path": "::Dashboard overview: response is JSON",
+                    "id": "e62984076f0ab45b1672eaeba647bdfa",
+                    "passes": 2815,
+                    "fails": 0,
+                    "name": "Dashboard overview: response is JSON"
+                },
+                "Floor plans: status is OK": {
+                    "fails": 0,
+                    "name": "Floor plans: status is OK",
+                    "path": "::Floor plans: status is OK",
+                    "id": "a4a6d674d2d9e497493d74b6d8f42bdc",
+                    "passes": 2788
+                },
+                "Floor plans: response is JSON": {
+                    "path": "::Floor plans: response is JSON",
+                    "id": "b03218f1e2c474337f9d8897c5363d3a",
+                    "passes": 2788,
+                    "fails": 0,
+                    "name": "Floor plans: response is JSON"
+                },
+                "Desk availability: status is OK": {
+                    "passes": 2774,
+                    "fails": 0,
+                    "name": "Desk availability: status is OK",
+                    "path": "::Desk availability: status is OK",
+                    "id": "18bba12c0e4809d371762f6f287332bf"
+                },
+                "Desk availability: response is JSON": {
+                    "path": "::Desk availability: response is JSON",
+                    "id": "21da56d60c6d9deafb4928cafa2e05c7",
+                    "passes": 2774,
+                    "fails": 0,
+                    "name": "Desk availability: response is JSON"
+                },
+                "Equipment list: status is OK": {
+                    "path": "::Equipment list: status is OK",
+                    "id": "ef8f91b55729ed5e25f673b573095b10",
+                    "passes": 2757,
+                    "fails": 0,
+                    "name": "Equipment list: status is OK"
+                },
+                "Equipment list: response is JSON": {
+                    "id": "60cc8bb1cf40eb1e244427210093ab0b",
+                    "passes": 2757,
+                    "fails": 0,
+                    "name": "Equipment list: response is JSON",
+                    "path": "::Equipment list: response is JSON"
+                },
+                "Reservations mine: status is OK": {
+                    "passes": 2731,
+                    "fails": 0,
+                    "name": "Reservations mine: status is OK",
+                    "path": "::Reservations mine: status is OK",
+                    "id": "7bd85f88a1e4f0f37f8a0cf6a60ac5ba"
+                },
+                "Reservations mine: response is JSON": {
+                    "id": "b983ba46ebe698634aef6a682574de3e",
+                    "passes": 2731,
+                    "fails": 0,
+                    "name": "Reservations mine: response is JSON",
+                    "path": "::Reservations mine: response is JSON"
+                }
+            },
+        "name": ""
+    },
+    "metrics": {
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 13865,
+            "thresholds": {
+                "rate<0.02": false
+            },
+            "value": 0
+        },
+        "data_received": {
+            "count": 19376086,
+            "rate": 64519.34544681997
+        },
+        "http_reqs": {
+            "count": 13865,
+            "rate": 46.16828830240323
+        },
+        "http_req_receiving": {
+            "max": 2.236,
+            "p(90)": 0.075,
+            "p(95)": 0.089,
+            "avg": 0.044126721961773224,
+            "min": 0.007,
+            "med": 0.037
+        },
+        "http_req_duration{expected_response:true}": {
+            "min": 5.395,
+            "med": 29.447,
+            "max": 212.088,
+            "p(90)": 89.9642,
+            "p(95)": 105.87339999999998,
+            "avg": 40.75210256040378
+        },
+        "http_req_blocked": {
+            "avg": 0.007448900108186249,
+            "min": 0,
+            "med": 0.004,
+            "max": 0.647,
+            "p(90)": 0.009,
+            "p(95)": 0.012
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "http_req_waiting": {
+            "avg": 40.69091669671836,
+            "min": 5.35,
+            "med": 29.402,
+            "max": 212.025,
+            "p(90)": 89.92720000000001,
+            "p(95)": 105.84599999999996
+        },
+        "data_sent": {
+            "count": 2282209,
+            "rate": 7599.400149898259
+        },
+        "http_req_sending": {
+            "med": 0.014,
+            "max": 0.834,
+            "p(90)": 0.029,
+            "p(95)": 0.036,
+            "avg": 0.017059141723764222,
+            "min": 0.002
+        },
+        "iterations": {
+            "count": 13865,
+            "rate": 46.16828830240323
+        },
+        "checks": {
+            "passes": 27730,
+            "fails": 0,
+            "value": 1
+        },
+        "vus": {
+            "value": 3,
+            "min": 1,
+            "max": 100
+        },
+        "iteration_duration": {
+            "p(90)": 1090.2336668,
+            "p(95)": 1106.032575,
+            "avg": 1041.2568582620995,
+            "min": 1005.731875,
+            "med": 1029.8535,
+            "max": 1212.466209
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "avg": 0.002064983772087991,
+            "min": 0,
+            "med": 0,
+            "max": 0.532,
+            "p(90)": 0
+        },
+        "vus_max": {
+            "value": 100,
+            "min": 100,
+            "max": 100
+        },
+        "http_req_duration": {
+            "p(90)": 89.9642,
+            "p(95)": 105.87339999999998,
+            "avg": 40.75210256040378,
+            "min": 5.395,
+            "med": 29.447,
+            "max": 212.088,
+            "thresholds": {
+                "p(95)<1000": false,
+                "p(99)<2000": false
+            }
+        }
+    }
+}

@@ -1,0 +1,196 @@
+{
+    "metrics": {
+        "data_received": {
+            "count": 102700,
+            "rate": 231402.2027146385
+        },
+        "http_req_blocked": {
+            "p(95)": 0.021449999999999962,
+            "avg": 0.014459999999999952,
+            "min": 0.001,
+            "med": 0.003,
+            "max": 0.4,
+            "p(90)": 0.011300000000000006
+        },
+        "http_req_connecting": {
+            "avg": 0.00457,
+            "min": 0,
+            "med": 0,
+            "max": 0.163,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "benchmark_reservation_flow_duration": {
+            "min": 26.015,
+            "med": 29.443,
+            "max": 47.1,
+            "p(90)": 40.453500000000005,
+            "p(95)": 42.49155,
+            "avg": 32.145700000000005,
+            "thresholds": {
+                "avg<800": false,
+                "p(95)<1400": false
+            }
+        },
+        "http_req_receiving": {
+            "min": 0.015,
+            "med": 0.047,
+            "max": 0.125,
+            "p(90)": 0.0721,
+            "p(95)": 0.08549999999999996,
+            "avg": 0.049739999999999986
+        },
+        "http_req_waiting": {
+            "avg": 10.056360000000003,
+            "min": 6.712,
+            "med": 9.5585,
+            "max": 16.354,
+            "p(90)": 13.125200000000001,
+            "p(95)": 13.967399999999996
+        },
+        "http_reqs": {
+            "count": 100,
+            "rate": 225.31860050110856
+        },
+        "group_duration": {
+            "max": 16.708,
+            "p(90)": 14.3300417,
+            "p(95)": 15.3062982,
+            "avg": 11.069864525000002,
+            "min": 8.470958,
+            "med": 10.323229000000001
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 100,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "data_sent": {
+            "count": 17300,
+            "rate": 38980.11788669178
+        },
+        "http_req_tls_handshaking": {
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_sending": {
+            "avg": 0.017489999999999978,
+            "min": 0.004,
+            "med": 0.011,
+            "max": 0.296,
+            "p(90)": 0.018300000000000007,
+            "p(95)": 0.02619999999999998
+        },
+        "iterations": {
+            "count": 20,
+            "rate": 45.063720100221715
+        },
+        "http_req_duration": {
+            "avg": 10.123589999999995,
+            "min": 6.786,
+            "med": 9.612,
+            "max": 16.394,
+            "p(90)": 13.2899,
+            "p(95)": 14.011749999999996
+        },
+        "http_req_duration{expected_response:true}": {
+            "med": 9.612,
+            "max": 16.394,
+            "p(90)": 13.2899,
+            "p(95)": 14.011749999999996,
+            "avg": 10.123589999999995,
+            "min": 6.786
+        },
+        "iteration_duration": {
+            "avg": 22.174833400000004,
+            "min": 18.710625,
+            "med": 21.361625,
+            "max": 27.710791,
+            "p(90)": 26.5889333,
+            "p(95)": 27.35517465
+        },
+        "benchmark_dashboard_flow_duration": {
+            "med": 17.539,
+            "max": 26.945999999999998,
+            "p(90)": 21.3125,
+            "p(95)": 23.61625,
+            "avg": 18.472250000000006,
+            "min": 15.033,
+            "thresholds": {
+                "p(95)<1200": false,
+                "avg<700": false
+            }
+        },
+        "checks": {
+            "passes": 100,
+            "fails": 0,
+            "value": 1
+        }
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "Benchmark dashboardu": {
+                "name": "Benchmark dashboardu",
+                "path": "::Benchmark dashboardu",
+                "id": "9ec25bd8f82df6fddc3d5fb20d058056",
+                "groups": {},
+                "checks": {
+                        "Dashboard overview: batch status is OK": {
+                            "id": "aecdf13bdc3888c414ea53954823e86e",
+                            "passes": 20,
+                            "fails": 0,
+                            "name": "Dashboard overview: batch status is OK",
+                            "path": "::Benchmark dashboardu::Dashboard overview: batch status is OK"
+                        },
+                        "Floor plans: batch status is OK": {
+                            "name": "Floor plans: batch status is OK",
+                            "path": "::Benchmark dashboardu::Floor plans: batch status is OK",
+                            "id": "a826d9b0040c44b23e176953e708e31a",
+                            "passes": 20,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Benchmark rezerwacji": {
+                "name": "Benchmark rezerwacji",
+                "path": "::Benchmark rezerwacji",
+                "id": "4f388f25f3e13b843fe6ab0d6be2d58f",
+                "groups": {},
+                "checks": {
+                        "Desk availability: batch status is OK": {
+                            "name": "Desk availability: batch status is OK",
+                            "path": "::Benchmark rezerwacji::Desk availability: batch status is OK",
+                            "id": "c0bbfe091d2b7e22b417c748fb8682c5",
+                            "passes": 20,
+                            "fails": 0
+                        },
+                        "Room availability: batch status is OK": {
+                            "id": "401c4bc24329c85f84933b33b26fc910",
+                            "passes": 20,
+                            "fails": 0,
+                            "name": "Room availability: batch status is OK",
+                            "path": "::Benchmark rezerwacji::Room availability: batch status is OK"
+                        },
+                        "Reservations mine: batch status is OK": {
+                            "passes": 20,
+                            "fails": 0,
+                            "name": "Reservations mine: batch status is OK",
+                            "path": "::Benchmark rezerwacji::Reservations mine: batch status is OK",
+                            "id": "3afb3ff784c1d74677d62524d01e0acd"
+                        }
+                    }
+            }
+        },
+        "checks": {}
+    }
+}

@@ -15,5 +15,3 @@ tsconfig.tsbuildinfo
 
 .pnpm-store/
 
-# k6 test results
-tests/k6/results/
