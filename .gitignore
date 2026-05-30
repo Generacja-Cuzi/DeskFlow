@@ -12,3 +12,5 @@ node_modules/
 tsconfig.tsbuildinfo
 # clerk configuration (can include secrets)
 /.clerk/
+
+.pnpm-store/

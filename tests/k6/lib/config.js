@@ -3,7 +3,6 @@ const activeCompanyId = __ENV.ACTIVE_COMPANY_ID || 'company-techstart';
 
 export const BASE_URL = (__ENV.BASE_URL || defaultBaseUrl).replace(/\/$/, '');
 export const THINK_TIME_SECONDS = Number(__ENV.THINK_TIME_SECONDS || '1');
-export const ALLOW_AUTH_FAILURES = __ENV.ALLOW_AUTH_FAILURES === '1';
 
 export function today() {
   return new Date().toISOString().slice(0, 10);
@@ -18,15 +17,8 @@ export function commonParams(name) {
     Accept: 'application/json',
   };
 
-  const cookieParts = [];
-  if (__ENV.AUTH_COOKIE) {
-    cookieParts.push(__ENV.AUTH_COOKIE);
-  }
   if (activeCompanyId) {
-    cookieParts.push(`activeCompanyId=${activeCompanyId}`);
-  }
-  if (cookieParts.length > 0) {
-    headers.Cookie = cookieParts.join('; ');
+    headers.Cookie = `activeCompanyId=${activeCompanyId}`;
   }
 
   return {
@@ -36,11 +28,7 @@ export function commonParams(name) {
 }
 
 export function expectedStatus(status) {
-  if (status === 200) {
-    return true;
-  }
-
-  return ALLOW_AUTH_FAILURES && (status === 401 || status === 403);
+  return status === 200;
 }
 
 export const endpoints = {

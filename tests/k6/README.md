@@ -8,7 +8,7 @@ Skrypty sa podzielone zgodnie z typami testow:
 - `05-load.js` - testy obciazenia: stopniowy wzrost liczby VU.
 - `06-scalability.js` - testy skalowalnosci: porownanie 10, 50, 100 i 200 uzytkownikow.
 
-## Uruchamianie
+## Uruchamianie (lokalnie)
 
 Najpierw uruchom aplikacje lokalnie:
 
@@ -26,28 +26,12 @@ k6 run tests/k6/05-load.js
 k6 run tests/k6/06-scalability.js
 ```
 
-Domyslny adres to `http://localhost:3000`. Mozesz go zmienic przez `BASE_URL`:
+Nie trzeba nic dodatkowo ustawiac. Bez sesji Clerk API lokalnie uzywa uzytkownika fallback, a cookie `activeCompanyId=company-techstart` jest dokladane automatycznie, wiec endpointy zwracaja `200`.
 
-```bash
-BASE_URL=https://twoja-aplikacja.example.com k6 run tests/k6/02-performance.js
-```
-
-Endpointy korzystaja z cookie `activeCompanyId`. Domyslnie ustawiany jest `company-techstart`, ale mozna podac inna firme:
+Domyslny adres to `http://localhost:3000`. Mozesz go zmienic przez `BASE_URL`, a firme przez `ACTIVE_COMPANY_ID`:
 
 ```bash
 ACTIVE_COMPANY_ID=company-demo k6 run tests/k6/03-response-time.js
-```
-
-Dla srodowisk z wymaganym logowaniem przekaż cookie sesji w `AUTH_COOKIE`:
-
-```bash
-AUTH_COOKIE="__session=..." BASE_URL=https://twoja-aplikacja.example.com k6 run tests/k6/02-performance.js
-```
-
-Jesli chcesz uruchomic test tylko po to, aby sprawdzic dostepnosc endpointow bez sesji, mozna tymczasowo dopuscic odpowiedzi `401` i `403`:
-
-```bash
-ALLOW_AUTH_FAILURES=1 k6 run tests/k6/02-performance.js
 ```
 
 ## Eksport do Grafana Cloud
