@@ -1,0 +1,267 @@
+\section{Wyniki eksperymentalne i testy systemu}
+
+Testy wydajnościowe aplikacji DeskFlow wykonano dnia 30 maja 2026 r. o godzinie 15:34:52. Do pomiarów wykorzystano narzędzie Grafana k6. Wszystkie scenariusze zakończyły się powodzeniem: odnotowano 0\% błędów HTTP, 100\% poprawnych asercji oraz spełnienie wszystkich zdefiniowanych progów jakościowych.
+
+\subsection{Zakres testów}
+
+\begin{table}[H]
+\centering
+\caption{Zakres wykonanych testów wydajnościowych}
+\label{tab:k6-test-scope}
+\begin{tabular}{lll}
+\toprule
+Test & Plik & Zakres pomiaru \\
+\midrule
+Wydajność & \texttt{02-performance.js} & Stabilność przy normalnym ruchu, 10 VU \\
+Czas odpowiedzi & \texttt{03-response-time.js} & Latencja per endpoint, p95 \\
+Benchmarki & \texttt{04-benchmarks.js} & Czas całych przepływów biznesowych \\
+Obciążenie & \texttt{05-load.js} & Zachowanie przy ruchu rosnącym od 10 do 100 VU \\
+Skalowalność & \texttt{06-scalability.js} & Porównanie 10, 50, 100 i 200 VU \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Testowane endpointy API}
+\label{tab:k6-tested-endpoints}
+\begin{tabular}{ll}
+\toprule
+Endpoint & Opis \\
+\midrule
+\texttt{GET /api/dashboard/overview} & Statystyki dashboardu \\
+\texttt{GET /api/floor-plans} & Plany pięter \\
+\texttt{GET /api/reservations/availability?type=desk} & Dostępność biurek \\
+\texttt{GET /api/reservations/availability?type=room} & Dostępność sal \\
+\texttt{GET /api/equipment} & Lista sprzętu \\
+\texttt{GET /api/reservations?mine=1} & Rezerwacje użytkownika \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Podsumowanie wykonawcze}
+
+\begin{table}[H]
+\centering
+\caption{Podsumowanie całej serii testów k6}
+\label{tab:k6-executive-summary}
+\begin{tabular}{ll}
+\toprule
+Metryka & Wartość \\
+\midrule
+Łączna liczba żądań HTTP & 42 665 \\
+Łączna liczba asercji & 56 230 \\
+Skuteczność asercji & 100\% \\
+Wskaźnik błędów HTTP & 0,00\% \\
+Czas trwania całej serii & około 10 min \\
+Najwolniejszy scenariusz, p95 & Skalowalność przy 200 VU, 417 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Wolumen ruchu i danych w poszczególnych testach}
+\label{tab:k6-traffic-volume}
+\begin{tabular}{lrrrrr}
+\toprule
+Test & Żądania & Asercje OK & Asercje błędne & Odebrano [KB] & Wysłano [KB] \\
+\midrule
+\texttt{02-performance} & 580 & 1 160 & 0 & 684,60 & 96,25 \\
+\texttt{03-response-time} & 25 & 50 & 0 & 22,09 & 4,08 \\
+\texttt{04-benchmarks} & 100 & 100 & 0 & 100,29 & 16,89 \\
+\texttt{05-load} & 13 865 & 27 730 & 0 & 18 921,96 & 2 228,72 \\
+\texttt{06-scalability} & 14 095 & 28 190 & 0 & 19 317,37 & 2 265,50 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Wyniki wskazują, że API działało stabilnie. Nie wystąpiły timeouty ani błędy 4xx/5xx. Przy 10 równoległych użytkownikach mediana czasu odpowiedzi wyniosła około 42 ms, a p95 około 77 ms. Przy wzroście obciążenia do 200 VU p95 wzrosło do 417 ms, pozostając istotnie poniżej progu 1800 ms.
+
+\subsection{Test wydajności}
+
+Test wydajnościowy wykonano dla 10 równoległych użytkowników przez 1 minutę przy stałym obciążeniu oraz 1-sekundowej przerwie między iteracjami.
+
+\begin{table}[H]
+\centering
+\caption{Wyniki testu wydajności \texttt{02-performance}}
+\label{tab:k6-performance}
+\begin{tabular}{llll}
+\toprule
+Metryka & Wartość & Próg & Status \\
+\midrule
+p95 czasu odpowiedzi & 77,42 ms & $<$ 700 ms & Spełniony \\
+p99 czasu odpowiedzi & 270,47 ms & $<$ 1200 ms & Spełniony \\
+Wskaźnik błędów & 0,00\% & $<$ 1\% & Spełniony \\
+Średnia latencja & 45,90 ms & -- & -- \\
+Mediana & 41,93 ms & -- & -- \\
+Maksimum & 273,21 ms & -- & -- \\
+Żądania HTTP & 580 & -- & -- \\
+Przepustowość & 9,55 req/s & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Rozkład czasu odpowiedzi per endpoint w teście \texttt{02-performance}}
+\label{tab:k6-performance-endpoints}
+\begin{tabular}{lrrrrr}
+\toprule
+Endpoint & Żądania & Średnia & Mediana & p95 & Maks. \\
+\midrule
+Dashboard overview & 100 & 70,13 ms & 49,19 ms & 270,75 ms & 273,21 ms \\
+Desk availability & 100 & 39,85 ms & 40,87 ms & 74,61 ms & 78,00 ms \\
+Equipment list & 90 & 42,40 ms & 39,61 ms & 78,71 ms & 82,93 ms \\
+Floor plans & 100 & 42,68 ms & 41,50 ms & 86,69 ms & 89,37 ms \\
+Reservations mine & 90 & 44,51 ms & 46,06 ms & 74,95 ms & 76,47 ms \\
+Room availability & 100 & 35,35 ms & 36,87 ms & 45,32 ms & 47,10 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Wszystkie testowane endpointy zwróciły poprawny status HTTP 200 oraz odpowiedź w formacie JSON.
+
+\subsection{Czas odpowiedzi endpointów}
+
+Test czasu odpowiedzi wykonano dla 1 VU i 25 iteracji z rotacją po wybranych endpointach.
+
+\begin{table}[H]
+\centering
+\caption{Czasy odpowiedzi endpointów w teście \texttt{03-response-time}}
+\label{tab:k6-response-time}
+\begin{tabular}{lllll}
+\toprule
+Endpoint & Średnia & Mediana & p95 & Próg p95 \\
+\midrule
+Dashboard overview & 12,16 ms & 9,69 ms & 19,33 ms & $<$ 500 ms \\
+Desk availability & 8,35 ms & 8,09 ms & 10,06 ms & $<$ 450 ms \\
+Equipment list & 8,37 ms & 7,88 ms & 11,12 ms & $<$ 500 ms \\
+Reservations mine & 8,82 ms & 8,47 ms & 10,48 ms & $<$ 500 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Najwolniejszym pojedynczym endpointem był \textit{Dashboard overview}, którego p95 wyniosło 19,33 ms. Wynik ten nadal pozostaje wielokrotnie poniżej progu 500 ms.
+
+\subsection{Benchmarki przepływów biznesowych}
+
+Benchmarki wykonano dla 1 VU i 20 iteracji, mierząc czas całych przepływów realizowanych jako batch zapytań HTTP.
+
+\begin{table}[H]
+\centering
+\caption{Benchmarki przepływów biznesowych w teście \texttt{04-benchmarks}}
+\label{tab:k6-benchmarks}
+\begin{tabular}{lllll}
+\toprule
+Przepływ & Endpointy & Średnia & p95 & Próg \\
+\midrule
+Dashboard & overview + floor-plans & 18,47 ms & 23,62 ms & avg $<$ 700 ms, p95 $<$ 1200 ms \\
+Rezerwacje & desk + room availability + reservations & 32,15 ms & 42,49 ms & avg $<$ 800 ms, p95 $<$ 1400 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Przepływ rezerwacji trwał średnio 32,15 ms, czyli około 1,7 razy dłużej niż przepływ dashboardu, który osiągnął średnio 18,47 ms. Oba przepływy zakończyły się bez błędów.
+
+\subsection{Test obciążenia}
+
+Test obciążenia wykorzystał profil ramping VU: 10, 50 i 100 równoległych użytkowników, łącznie przez około 5 minut.
+
+\begin{table}[H]
+\centering
+\caption{Wyniki testu obciążenia \texttt{05-load}}
+\label{tab:k6-load}
+\begin{tabular}{llll}
+\toprule
+Metryka & Wartość & Próg & Status \\
+\midrule
+p95 czasu odpowiedzi & 105,87 ms & $<$ 1000 ms & Spełniony \\
+p99 czasu odpowiedzi & 133,67 ms & $<$ 2000 ms & Spełniony \\
+Wskaźnik błędów & 0,00\% & $<$ 2\% & Spełniony \\
+Średnia latencja & 40,75 ms & -- & -- \\
+Mediana & 29,45 ms & -- & -- \\
+Maksimum & 212,09 ms & -- & -- \\
+Żądania HTTP & 13 865 & -- & -- \\
+Przepustowość & 46,17 req/s & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Rozkład czasu odpowiedzi per endpoint w teście obciążenia \texttt{05-load}}
+\label{tab:k6-load-endpoints}
+\begin{tabular}{lrrrrr}
+\toprule
+Endpoint & Żądania & Średnia & Mediana & p95 & Maks. \\
+\midrule
+Dashboard overview & 2 815 & 44,34 ms & 29,86 ms & 116,19 ms & 212,09 ms \\
+Desk availability & 2 774 & 38,18 ms & 28,60 ms & 97,19 ms & 145,62 ms \\
+Equipment list & 2 757 & 39,93 ms & 31,20 ms & 97,66 ms & 144,62 ms \\
+Floor plans & 2 788 & 39,51 ms & 26,88 ms & 105,18 ms & 190,56 ms \\
+Reservations mine & 2 731 & 41,77 ms & 30,84 ms & 105,81 ms & 183,68 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+System utrzymał stabilność przy maksymalnie 100 równoległych użytkownikach bez degradacji dostępności i bez błędów HTTP.
+
+\subsection{Test skalowalności}
+
+Test skalowalności obejmował cztery scenariusze sekwencyjne: 10, 50, 100 i 200 równoległych użytkowników, po 45 sekund każdy.
+
+\begin{table}[H]
+\centering
+\caption{Wyniki testu skalowalności \texttt{06-scalability}}
+\label{tab:k6-scalability}
+\begin{tabular}{lllll}
+\toprule
+Równolegli użytkownicy & Średnia & Mediana & p95 & Próg p95 \\
+\midrule
+10 VU & 40,68 ms & 39,48 ms & 55,26 ms & $<$ 700 ms \\
+50 VU & 68,46 ms & 73,82 ms & 133,84 ms & $<$ 900 ms \\
+100 VU & 68,40 ms & 53,00 ms & 163,88 ms & $<$ 1200 ms \\
+200 VU & 248,72 ms & 303,56 ms & 417,20 ms & $<$ 1800 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Endpointy w najcięższym wariancie testu skalowalności, 200 VU}
+\label{tab:k6-scalability-200-endpoints}
+\begin{tabular}{lrrrrr}
+\toprule
+Endpoint & Żądania & Średnia & Mediana & p95 & Maks. \\
+\midrule
+Dashboard overview & 1 508 & 296,05 ms & 357,40 ms & 517,88 ms & 623,04 ms \\
+Desk availability & 1 452 & 214,14 ms & 282,16 ms & 346,92 ms & 483,75 ms \\
+Equipment list & 1 445 & 244,67 ms & 292,18 ms & 360,17 ms & 552,02 ms \\
+Floor plans & 1 471 & 223,89 ms & 298,07 ms & 382,53 ms & 442,61 ms \\
+Reservations mine & 1 401 & 263,89 ms & 318,00 ms & 403,66 ms & 587,12 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Metryki ogólne testu skalowalności}
+\label{tab:k6-scalability-summary}
+\begin{tabular}{ll}
+\toprule
+Metryka & Wartość \\
+\midrule
+Łączne żądania HTTP & 14 095 \\
+Wskaźnik błędów HTTP & 0,00\% \\
+Średnia latencja całego testu & 160,64 ms \\
+Mediana całego testu & 103,84 ms \\
+p95 całego testu & 391,32 ms \\
+Maksimum & 623,04 ms \\
+Przepustowość & 71,91 req/s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Przy czterokrotnym wzroście liczby użytkowników z 50 do 200 VU latencja p95 wzrosła z 133,84 ms do 417,20 ms. Oznacza to około trzykrotny wzrost opóźnienia przy zachowaniu stabilności i braku błędów HTTP.
+
